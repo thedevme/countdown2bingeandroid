@@ -5,16 +5,27 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = Primary,
+    onPrimary = OnPrimary,
+    primaryContainer = PrimaryVariant,
+    secondary = Secondary,
+    onSecondary = OnSecondary,
+    secondaryContainer = SecondaryVariant,
+    tertiary = AccentGold,
+    background = Background,
+    onBackground = OnBackground,
+    surface = Surface,
+    onSurface = OnBackground,
+    surfaceVariant = SurfaceVariant,
+    onSurfaceVariant = OnBackgroundMuted,
+    outline = OnBackgroundSubtle,
+    error = AccentError
 )
 
 @Composable
 fun Countdown2BingeTheme(
     content: @Composable () -> Unit
 ) {
-    // App is dark-only, no dynamic colors
     MaterialTheme(
         colorScheme = DarkColorScheme,
         typography = Typography,
