@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.designtoswiftui.countdown2binge.ui.bingeready.BingeReadyScreen
 import io.designtoswiftui.countdown2binge.ui.search.SearchScreen
+import io.designtoswiftui.countdown2binge.ui.showdetail.EpisodeListScreen
 import io.designtoswiftui.countdown2binge.ui.showdetail.ShowDetailScreen
 import io.designtoswiftui.countdown2binge.ui.timeline.TimelineScreen
 
@@ -21,6 +22,9 @@ sealed class Screen(val route: String) {
     data object Search : Screen("search")
     data object ShowDetail : Screen("show_detail/{showId}") {
         fun createRoute(showId: Long): String = "show_detail/$showId"
+    }
+    data object EpisodeList : Screen("episode_list/{seasonId}") {
+        fun createRoute(seasonId: Long): String = "episode_list/$seasonId"
     }
 }
 
@@ -95,7 +99,25 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onSeasonClick = { seasonId ->
-                    // Future: Navigate to episode list
+                    navController.navigate(Screen.EpisodeList.createRoute(seasonId))
+                }
+            )
+        }
+
+        // Episode List screen
+        composable(
+            route = Screen.EpisodeList.route,
+            arguments = listOf(
+                navArgument("seasonId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val seasonId = backStackEntry.arguments?.getLong("seasonId") ?: 0L
+            EpisodeListScreen(
+                seasonId = seasonId,
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
