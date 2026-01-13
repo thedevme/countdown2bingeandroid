@@ -72,11 +72,9 @@ fun NavGraph(
         // Search screen
         composable(Screen.Search.route) {
             SearchScreen(
-                onShowClick = { tmdbId ->
-                    // Note: Search returns TMDB ID, need to handle this
-                    // For now, we navigate but ShowDetail needs the local ID
-                    // This will be resolved when we have proper show lookup
-                    navController.navigate(Screen.ShowDetail.createRoute(tmdbId.toLong()))
+                onShowClick = { localShowId ->
+                    // SearchScreen now provides the local database ID
+                    navController.navigate(Screen.ShowDetail.createRoute(localShowId))
                 }
             )
         }

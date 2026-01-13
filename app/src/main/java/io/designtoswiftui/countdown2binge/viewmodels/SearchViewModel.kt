@@ -54,6 +54,10 @@ class SearchViewModel @Inject constructor(
     private val _followedShows = MutableStateFlow<Set<Int>>(emptySet())
     val followedShows: StateFlow<Set<Int>> = _followedShows.asStateFlow()
 
+    // Map of TMDB ID to local database ID for followed shows
+    private val _showIdMap = MutableStateFlow<Map<Int, Long>>(emptyMap())
+    val showIdMap: StateFlow<Map<Int, Long>> = _showIdMap.asStateFlow()
+
     // Event for showing snackbar messages
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
@@ -131,15 +135,20 @@ class SearchViewModel @Inject constructor(
 
     /**
      * Check which shows from the results are already followed.
+     * Also builds a map of TMDB ID to local database ID for navigation.
      */
     private suspend fun checkFollowedStatus(tmdbIds: List<Int>) {
         val followed = mutableSetOf<Int>()
-        for (id in tmdbIds) {
-            if (repository.isShowFollowed(id)) {
-                followed.add(id)
+        val idMap = mutableMapOf<Int, Long>()
+        for (tmdbId in tmdbIds) {
+            val show = repository.getShow(tmdbId)
+            if (show != null) {
+                followed.add(tmdbId)
+                idMap[tmdbId] = show.id
             }
         }
         _followedShows.value = followed
+        _showIdMap.value = idMap
     }
 
     /**
@@ -157,8 +166,9 @@ class SearchViewModel @Inject constructor(
 
         return result.fold(
             onSuccess = { show ->
-                // Mark as followed
+                // Mark as followed and add to ID map
                 _followedShows.update { it + tmdbId }
+                _showIdMap.update { it + (tmdbId to show.id) }
                 _snackbarMessage.value = "${show.title} added to your shows"
                 true
             },
@@ -183,6 +193,14 @@ class SearchViewModel @Inject constructor(
      */
     fun isFollowed(tmdbId: Int): Boolean {
         return _followedShows.value.contains(tmdbId)
+    }
+
+    /**
+     * Get the local database ID for a TMDB ID.
+     * Returns null if the show is not followed.
+     */
+    fun getLocalShowId(tmdbId: Int): Long? {
+        return _showIdMap.value[tmdbId]
     }
 
     /**

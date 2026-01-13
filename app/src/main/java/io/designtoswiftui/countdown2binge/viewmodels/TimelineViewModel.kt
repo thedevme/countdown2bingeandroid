@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.designtoswiftui.countdown2binge.models.Season
 import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
+import io.designtoswiftui.countdown2binge.models.ShowStatus
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,22 +114,60 @@ class TimelineViewModel @Inject constructor(
 
     /**
      * Group timeline shows by their season state.
+     *
+     * Logic:
+     * - inProduction AND last episode aired → Anticipated (TBD - more seasons coming)
+     * - Currently airing (some episodes future) → Airing Now
+     * - Has premiere date in future → Premiering Soon
+     * - NOT inProduction AND season complete → NOT in timeline (Binge Ready only)
+     * - Cancelled/Ended → NOT in timeline (Binge Ready only)
      */
     private fun groupShowsByState(shows: List<TimelineShow>) {
         val airing = mutableListOf<TimelineShow>()
         val premiering = mutableListOf<TimelineShow>()
         val anticipated = mutableListOf<TimelineShow>()
 
-        for (show in shows) {
-            when (show.season?.state) {
-                SeasonState.AIRING -> airing.add(show)
-                SeasonState.PREMIERING -> premiering.add(show)
-                SeasonState.ANTICIPATED -> anticipated.add(show)
-                SeasonState.BINGE_READY, SeasonState.WATCHED, null -> {
-                    // These don't appear in timeline, but if there's no relevant season,
-                    // add to anticipated
-                    if (show.season == null) {
-                        anticipated.add(show)
+        for (timelineShow in shows) {
+            val show = timelineShow.show
+            val season = timelineShow.season
+            val isInProduction = show.status == ShowStatus.RETURNING || show.status == ShowStatus.IN_PRODUCTION
+
+            // Skip shows that are ended/canceled - they only go to Binge Ready
+            if (show.status == ShowStatus.ENDED || show.status == ShowStatus.CANCELED) {
+                continue
+            }
+
+            when (season?.state) {
+                SeasonState.AIRING -> {
+                    // Currently airing - show in Airing Now
+                    airing.add(timelineShow)
+                }
+                SeasonState.PREMIERING -> {
+                    // Has future premiere date - show in Premiering Soon
+                    premiering.add(timelineShow)
+                }
+                SeasonState.ANTICIPATED -> {
+                    // No premiere date yet - show in Anticipated
+                    anticipated.add(timelineShow)
+                }
+                SeasonState.BINGE_READY -> {
+                    // Season is complete - if show is in production, it goes to Anticipated
+                    // (waiting for next season), otherwise skip (Binge Ready only)
+                    if (isInProduction) {
+                        anticipated.add(timelineShow)
+                    }
+                }
+                SeasonState.WATCHED -> {
+                    // Already watched - if show is in production, it goes to Anticipated
+                    // (waiting for next season)
+                    if (isInProduction) {
+                        anticipated.add(timelineShow)
+                    }
+                }
+                null -> {
+                    // No season data - if in production, show in Anticipated
+                    if (isInProduction) {
+                        anticipated.add(timelineShow)
                     }
                 }
             }

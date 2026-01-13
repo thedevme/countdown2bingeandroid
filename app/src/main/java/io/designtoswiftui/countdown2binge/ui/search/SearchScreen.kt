@@ -1,8 +1,5 @@
 package io.designtoswiftui.countdown2binge.ui.search
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +73,7 @@ import io.designtoswiftui.countdown2binge.viewmodels.SearchViewModel
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
-    onShowClick: (Int) -> Unit = {}
+    onShowClick: (Long) -> Unit = {}
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
@@ -85,6 +82,7 @@ fun SearchScreen(
     val followedShows by viewModel.followedShows.collectAsState()
     val addingShows by viewModel.addingShows.collectAsState()
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
+    val showIdMap by viewModel.showIdMap.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
@@ -156,6 +154,7 @@ fun SearchScreen(
                             results = searchResults,
                             followedShows = followedShows,
                             addingShows = addingShows,
+                            showIdMap = showIdMap,
                             onShowClick = onShowClick,
                             onAddClick = viewModel::addShowAsync
                         )
@@ -163,14 +162,11 @@ fun SearchScreen(
                 }
 
                 // Loading overlay when searching with existing results
-                AnimatedVisibility(
-                    visible = isSearching && searchResults.isNotEmpty(),
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                    modifier = Modifier.align(Alignment.TopCenter)
-                ) {
+                if (isSearching && searchResults.isNotEmpty()) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(16.dp),
                         color = Primary,
                         strokeWidth = 2.dp
                     )
@@ -264,7 +260,8 @@ private fun SearchResultsList(
     results: List<TMDBSearchResult>,
     followedShows: Set<Int>,
     addingShows: Set<Int>,
-    onShowClick: (Int) -> Unit,
+    showIdMap: Map<Int, Long>,
+    onShowClick: (Long) -> Unit,
     onAddClick: (Int) -> Unit
 ) {
     LazyColumn(
@@ -276,11 +273,19 @@ private fun SearchResultsList(
             items = results,
             key = { it.id }
         ) { result ->
+            val isFollowed = followedShows.contains(result.id)
+            val localShowId = showIdMap[result.id]
+
             SearchResultItem(
                 result = result,
-                isFollowed = followedShows.contains(result.id),
+                isFollowed = isFollowed,
                 isAdding = addingShows.contains(result.id),
-                onClick = { onShowClick(result.id) },
+                onClick = {
+                    // Only navigate if the show is followed and we have the local ID
+                    if (isFollowed && localShowId != null) {
+                        onShowClick(localShowId)
+                    }
+                },
                 onAddClick = { onAddClick(result.id) }
             )
         }
