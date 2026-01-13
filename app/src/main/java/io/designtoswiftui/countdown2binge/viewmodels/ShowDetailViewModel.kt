@@ -9,6 +9,7 @@ import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
+import io.designtoswiftui.countdown2binge.usecases.RefreshShowUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +24,13 @@ data class SeasonDetail(
     val season: Season,
     val daysUntilPremiere: Int?,
     val daysUntilFinale: Int?,
-    val episodesRemaining: Int?
-)
+    val episodesRemaining: Int?,
+    val watchedCount: Int = 0,
+    val totalEpisodes: Int = 0
+) {
+    val isFullyWatched: Boolean
+        get() = watchedCount >= totalEpisodes && totalEpisodes > 0
+}
 
 /**
  * ViewModel for the Show Detail screen.
@@ -34,6 +40,7 @@ data class SeasonDetail(
 class ShowDetailViewModel @Inject constructor(
     private val repository: ShowRepository,
     private val stateManager: SeasonStateManager,
+    private val refreshShowUseCase: RefreshShowUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -55,6 +62,10 @@ class ShowDetailViewModel @Inject constructor(
     // Error state
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    // Refreshing state (for pull-to-refresh or refresh button)
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
         if (showId > 0) {
@@ -104,11 +115,15 @@ class ShowDetailViewModel @Inject constructor(
         val seasonsList = repository.getSeasonsForShowSync(showId)
 
         val seasonDetails = seasonsList.map { season ->
+            val watchedCount = repository.getWatchedEpisodeCount(season.id)
+            val episodes = repository.getEpisodesForSeasonSync(season.id)
             SeasonDetail(
                 season = season,
                 daysUntilPremiere = stateManager.daysUntilPremiere(season, today),
                 daysUntilFinale = stateManager.daysUntilFinale(season, today),
-                episodesRemaining = stateManager.episodesRemaining(season)
+                episodesRemaining = stateManager.episodesRemaining(season),
+                watchedCount = watchedCount,
+                totalEpisodes = episodes.size
             )
         }.sortedByDescending { it.season.seasonNumber }
 
@@ -116,7 +131,34 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
-     * Refresh the show data.
+     * Refresh the show data from TMDB.
+     * Re-fetches all seasons and episodes.
+     */
+    fun refreshFromNetwork() {
+        if (showId <= 0) return
+
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            _error.value = null
+
+            try {
+                val result = refreshShowUseCase.execute(showId)
+                if (result.isSuccess) {
+                    // Reload local data after refresh
+                    loadShowById(showId)
+                } else {
+                    _error.value = result.exceptionOrNull()?.message ?: "Failed to refresh"
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to refresh: ${e.message}"
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    /**
+     * Refresh the show data from local database.
      */
     fun refresh() {
         if (showId > 0) {
@@ -177,6 +219,23 @@ class ShowDetailViewModel @Inject constructor(
             unmarkSeasonWatched(seasonId)
         } else {
             markSeasonWatched(seasonId)
+        }
+    }
+
+    /**
+     * Unfollow (delete) the current show.
+     * Returns true if successful.
+     */
+    fun unfollowShow(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                _show.value?.let { show ->
+                    repository.delete(show)
+                    onComplete()
+                }
+            } catch (e: Exception) {
+                _error.value = "Failed to unfollow: ${e.message}"
+            }
         }
     }
 }

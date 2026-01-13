@@ -34,6 +34,7 @@ val StateWatched = Color(0xFF6B6B70)  // Muted gray
 // Accent colors
 val AccentGold = Color(0xFFD4AF37)
 val AccentError = Color(0xFFE57373)
+val Destructive = Color(0xFFCF6679)  // Muted red for destructive actions
 
 // Gradients
 val GradientOverlayStart = Color(0x00000000)

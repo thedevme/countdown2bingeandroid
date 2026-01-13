@@ -61,30 +61,42 @@ class AddShowUseCase @Inject constructor(
         // Process show data into local model
         val show = processor.processShow(fullData, asOf)
 
-        // Process seasons
+        // Process seasons - fetch ALL season details for episode data
         val seasons = mutableListOf<io.designtoswiftui.countdown2binge.models.Season>()
         val episodesBySeasonTmdbId = mutableMapOf<Int, List<io.designtoswiftui.countdown2binge.models.Episode>>()
 
-        // Process the latest season with full details if available
-        fullData.latestSeasonDetails?.let { seasonDetails ->
-            val season = processor.processSeason(seasonDetails, 0, asOf) // showId will be set during save
-            seasons.add(season)
-
-            // Process episodes for this season
-            val episodes = processor.processEpisodes(seasonDetails, 0) // seasonId will be set during save
-            episodesBySeasonTmdbId[seasonDetails.id] = episodes
-        }
-
-        // Also process other seasons from the show summary (without episode details)
-        fullData.showDetails.seasons
-            ?.filter { summary ->
-                summary.seasonNumber > 0 && // Skip specials
-                        seasons.none { it.tmdbId == summary.id } // Skip if already processed
-            }
-            ?.forEach { summary ->
-                val season = processor.processSeasonSummary(summary, 0, asOf)
+        // Fetch details for ALL seasons (not just the latest)
+        val allSeasonsResult = aggregator.fetchAllSeasons(tmdbId)
+        if (allSeasonsResult.isSuccess) {
+            val allSeasonDetails = allSeasonsResult.getOrThrow()
+            for (seasonDetails in allSeasonDetails) {
+                val season = processor.processSeason(seasonDetails, 0, asOf) // showId will be set during save
                 seasons.add(season)
+
+                // Process episodes for this season
+                val episodes = processor.processEpisodes(seasonDetails, 0) // seasonId will be set during save
+                episodesBySeasonTmdbId[seasonDetails.id] = episodes
             }
+        } else {
+            // Fallback: use the latest season details if available, and summaries for others
+            fullData.latestSeasonDetails?.let { seasonDetails ->
+                val season = processor.processSeason(seasonDetails, 0, asOf)
+                seasons.add(season)
+                val episodes = processor.processEpisodes(seasonDetails, 0)
+                episodesBySeasonTmdbId[seasonDetails.id] = episodes
+            }
+
+            // Process other seasons from summary (without episode details)
+            fullData.showDetails.seasons
+                ?.filter { summary ->
+                    summary.seasonNumber > 0 &&
+                            seasons.none { it.tmdbId == summary.id }
+                }
+                ?.forEach { summary ->
+                    val season = processor.processSeasonSummary(summary, 0, asOf)
+                    seasons.add(season)
+                }
+        }
 
         // Sort seasons by season number
         val sortedSeasons = seasons.sortedBy { it.seasonNumber }

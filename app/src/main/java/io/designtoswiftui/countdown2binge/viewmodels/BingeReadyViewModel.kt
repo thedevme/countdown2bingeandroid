@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.designtoswiftui.countdown2binge.models.Season
+import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
+import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
+import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,8 +20,13 @@ import javax.inject.Inject
  */
 data class BingeReadySeason(
     val show: Show,
-    val season: Season
-)
+    val season: Season,
+    val watchedCount: Int = 0,
+    val totalEpisodes: Int = 0
+) {
+    val isFullyWatched: Boolean
+        get() = watchedCount >= totalEpisodes && totalEpisodes > 0
+}
 
 /**
  * ViewModel for the Binge Ready screen.
@@ -26,7 +34,8 @@ data class BingeReadySeason(
  */
 @HiltViewModel
 class BingeReadyViewModel @Inject constructor(
-    private val repository: ShowRepository
+    private val repository: ShowRepository,
+    private val stateManager: SeasonStateManager
 ) : ViewModel() {
 
     // Binge-ready seasons with their shows
@@ -62,12 +71,21 @@ class BingeReadyViewModel @Inject constructor(
 
                 _isEmpty.value = false
 
-                // Fetch show data for each season
+                // Fetch show data and watched count for each season
                 val bingeReadyList = mutableListOf<BingeReadySeason>()
                 for (season in seasons) {
                     val show = repository.getShowById(season.showId)
                     if (show != null) {
-                        bingeReadyList.add(BingeReadySeason(show = show, season = season))
+                        val watchedCount = repository.getWatchedEpisodeCount(season.id)
+                        val episodes = repository.getEpisodesForSeasonSync(season.id)
+                        bingeReadyList.add(
+                            BingeReadySeason(
+                                show = show,
+                                season = season,
+                                watchedCount = watchedCount,
+                                totalEpisodes = episodes.size
+                            )
+                        )
                     }
                 }
 
@@ -83,5 +101,58 @@ class BingeReadyViewModel @Inject constructor(
      */
     fun refresh() {
         loadBingeReadySeasons()
+    }
+
+    /**
+     * Mark a season as watched (marks all episodes as watched).
+     */
+    fun markSeasonWatched(seasonId: Long) {
+        viewModelScope.launch {
+            try {
+                // Mark all episodes as watched
+                val episodes = repository.getEpisodesForSeasonSync(seasonId)
+                for (episode in episodes) {
+                    if (!episode.isWatched) {
+                        repository.setEpisodeWatched(episode.id, true)
+                    }
+                }
+                // Mark the season as watched
+                repository.markSeasonWatched(seasonId)
+                // List will auto-refresh via Flow collection
+            } catch (e: Exception) {
+                // Handle error silently for now
+            }
+        }
+    }
+
+    /**
+     * Unmark a season as watched (marks all episodes as unwatched).
+     */
+    fun unmarkSeasonWatched(seasonId: Long) {
+        viewModelScope.launch {
+            try {
+                // Unmark all episodes
+                val episodes = repository.getEpisodesForSeasonSync(seasonId)
+                for (episode in episodes) {
+                    if (episode.isWatched) {
+                        repository.setEpisodeWatched(episode.id, false)
+                    }
+                }
+                // Find the season to determine its proper state
+                val season = _bingeReadySeasons.value.find { it.season.id == seasonId }?.season
+                val newState = if (season != null) {
+                    stateManager.determineState(
+                        season.copy(watchedDate = null),
+                        LocalDate.now()
+                    )
+                } else {
+                    SeasonState.BINGE_READY
+                }
+                repository.unmarkSeasonWatched(seasonId, newState)
+                // List will auto-refresh via Flow collection
+            } catch (e: Exception) {
+                // Handle error silently for now
+            }
+        }
     }
 }

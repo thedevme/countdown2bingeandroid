@@ -21,6 +21,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundMuted
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
 import io.designtoswiftui.countdown2binge.ui.theme.Primary
 import io.designtoswiftui.countdown2binge.ui.theme.StateBingeReady
+import io.designtoswiftui.countdown2binge.ui.theme.StateWatched
 import io.designtoswiftui.countdown2binge.ui.theme.Surface
 import io.designtoswiftui.countdown2binge.ui.theme.SurfaceVariant
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadySeason
@@ -75,7 +77,9 @@ fun BingeReadyScreen(
             else -> {
                 BingeReadyContent(
                     seasons = bingeReadySeasons,
-                    onSeasonClick = onSeasonClick
+                    onSeasonClick = onSeasonClick,
+                    onMarkWatched = viewModel::markSeasonWatched,
+                    onUnmarkWatched = viewModel::unmarkSeasonWatched
                 )
             }
         }
@@ -85,7 +89,9 @@ fun BingeReadyScreen(
 @Composable
 private fun BingeReadyContent(
     seasons: List<BingeReadySeason>,
-    onSeasonClick: (Long) -> Unit
+    onSeasonClick: (Long) -> Unit,
+    onMarkWatched: (Long) -> Unit,
+    onUnmarkWatched: (Long) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -103,7 +109,9 @@ private fun BingeReadyContent(
         ) { bingeReadySeason ->
             BingeReadyItem(
                 bingeReadySeason = bingeReadySeason,
-                onClick = { onSeasonClick(bingeReadySeason.show.id) }
+                onClick = { onSeasonClick(bingeReadySeason.show.id) },
+                onMarkWatched = { onMarkWatched(bingeReadySeason.season.id) },
+                onUnmarkWatched = { onUnmarkWatched(bingeReadySeason.season.id) }
             )
         }
     }
@@ -135,10 +143,13 @@ private fun BingeReadyHeader(count: Int) {
 @Composable
 private fun BingeReadyItem(
     bingeReadySeason: BingeReadySeason,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMarkWatched: () -> Unit,
+    onUnmarkWatched: () -> Unit
 ) {
     val show = bingeReadySeason.show
     val season = bingeReadySeason.season
+    val isFullyWatched = bingeReadySeason.isFullyWatched
 
     Card(
         modifier = Modifier
@@ -153,91 +164,111 @@ private fun BingeReadyItem(
             defaultElevation = 2.dp
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Poster image
-            AsyncImage(
-                model = show.posterPath?.let {
-                    "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
-                },
-                contentDescription = show.title,
+            Row(
                 modifier = Modifier
-                    .width(72.dp)
-                    .height(108.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceVariant),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Show and season info
-            Column(
-                modifier = Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Show title
-                Text(
-                    text = show.title,
-                    color = OnBackground,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                // Poster image
+                AsyncImage(
+                    model = show.posterPath?.let {
+                        "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
+                    },
+                    contentDescription = show.title,
+                    modifier = Modifier
+                        .width(72.dp)
+                        .height(108.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceVariant),
+                    contentScale = ContentScale.Crop
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                // Season number
-                Text(
-                    text = "Season ${season.seasonNumber}",
-                    color = OnBackgroundMuted,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Episode count badge
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                // Show and season info
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = StateBingeReady.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    // Show title
+                    Text(
+                        text = show.title,
+                        color = OnBackground,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Season number
+                    Text(
+                        text = "Season ${season.seasonNumber}",
+                        color = OnBackgroundMuted,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Episode count badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${season.episodeCount} episodes",
-                            color = StateBingeReady,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = StateBingeReady.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "${season.episodeCount} episodes",
+                                color = StateBingeReady,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
+                }
+
+                // Ready indicator
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = StateBingeReady.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✓",
+                        color = StateBingeReady,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            // Ready indicator
-            Box(
+            // Mark as Watched / Unmark button
+            TextButton(
+                onClick = if (isFullyWatched) onUnmarkWatched else onMarkWatched,
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = StateBingeReady.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 8.dp)
             ) {
                 Text(
-                    text = "✓",
-                    color = StateBingeReady,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    text = if (isFullyWatched) "Unmark as Watched" else "Mark as Watched",
+                    color = if (isFullyWatched) StateWatched else Primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,12 +28,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +65,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
 import io.designtoswiftui.countdown2binge.ui.theme.GradientOverlayEnd
 import io.designtoswiftui.countdown2binge.ui.theme.GradientOverlayStart
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
+import io.designtoswiftui.countdown2binge.ui.theme.Destructive
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundMuted
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
 import io.designtoswiftui.countdown2binge.ui.theme.Primary
@@ -81,12 +88,27 @@ fun ShowDetailScreen(
     val show by viewModel.show.collectAsState()
     val seasons by viewModel.seasons.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val error by viewModel.error.collectAsState()
 
     // Load show if not already loaded via SavedStateHandle
     LaunchedEffect(showId) {
         if (showId > 0 && show == null) {
             viewModel.loadShowById(showId)
+        }
+    }
+
+    // Refresh data when screen resumes (e.g., returning from episode list)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -106,10 +128,13 @@ fun ShowDetailScreen(
                 ShowDetailContent(
                     show = show!!,
                     seasons = seasons,
+                    isRefreshing = isRefreshing,
                     onBackClick = onBackClick,
                     onSeasonClick = onSeasonClick,
                     onMarkWatched = viewModel::markSeasonWatched,
-                    onUnmarkWatched = viewModel::unmarkSeasonWatched
+                    onUnmarkWatched = viewModel::unmarkSeasonWatched,
+                    onUnfollowShow = { viewModel.unfollowShow(onBackClick) },
+                    onRefresh = viewModel::refreshFromNetwork
                 )
             }
         }
@@ -120,14 +145,18 @@ fun ShowDetailScreen(
 private fun ShowDetailContent(
     show: Show,
     seasons: List<SeasonDetail>,
+    isRefreshing: Boolean,
     onBackClick: () -> Unit,
     onSeasonClick: (Long) -> Unit,
     onMarkWatched: (Long) -> Unit,
-    onUnmarkWatched: (Long) -> Unit
+    onUnmarkWatched: (Long) -> Unit,
+    onUnfollowShow: () -> Unit,
+    onRefresh: () -> Unit
 ) {
-    // State for confirmation dialog
+    // State for confirmation dialogs
     var showWatchedDialog by remember { mutableStateOf(false) }
     var selectedSeasonForDialog by remember { mutableStateOf<SeasonDetail?>(null) }
+    var showUnfollowDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize()
@@ -136,13 +165,18 @@ private fun ShowDetailContent(
         item {
             HeroHeader(
                 show = show,
-                onBackClick = onBackClick
+                isRefreshing = isRefreshing,
+                onBackClick = onBackClick,
+                onRefresh = onRefresh
             )
         }
 
         // Show info section
         item {
-            ShowInfoSection(show = show)
+            ShowInfoSection(
+                show = show,
+                onUnfollowClick = { showUnfollowDialog = true }
+            )
         }
 
         // Seasons header
@@ -197,12 +231,26 @@ private fun ShowDetailContent(
             }
         )
     }
+
+    // Unfollow confirmation dialog
+    if (showUnfollowDialog) {
+        UnfollowShowDialog(
+            showTitle = show.title,
+            onConfirm = {
+                showUnfollowDialog = false
+                onUnfollowShow()
+            },
+            onDismiss = { showUnfollowDialog = false }
+        )
+    }
 }
 
 @Composable
 private fun HeroHeader(
     show: Show,
-    onBackClick: () -> Unit
+    isRefreshing: Boolean,
+    onBackClick: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -235,18 +283,42 @@ private fun HeroHeader(
                 )
         )
 
-        // Back button
-        IconButton(
-            onClick = onBackClick,
+        // Top row with back and refresh buttons
+        Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .align(Alignment.TopStart)
-                .padding(8.dp)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = OnBackground
-            )
+            // Back button
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = OnBackground
+                )
+            }
+
+            // Refresh button
+            IconButton(
+                onClick = onRefresh,
+                enabled = !isRefreshing
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = OnBackground,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = OnBackground
+                    )
+                }
+            }
         }
 
         // Title overlay at bottom
@@ -301,7 +373,10 @@ private fun ShowStatusBadge(status: ShowStatus) {
 }
 
 @Composable
-private fun ShowInfoSection(show: Show) {
+private fun ShowInfoSection(
+    show: Show,
+    onUnfollowClick: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -317,6 +392,21 @@ private fun ShowInfoSection(show: Show) {
                     lineHeight = 22.sp
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Unfollow button
+        TextButton(
+            onClick = onUnfollowClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Unfollow Show",
+                color = Destructive,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -340,9 +430,13 @@ private fun SeasonCard(
 ) {
     val season = seasonDetail.season
     val isWatched = season.state == SeasonState.WATCHED
+    val isFullyWatched = seasonDetail.isFullyWatched
     val canMarkWatched = season.state == SeasonState.BINGE_READY ||
                          season.state == SeasonState.WATCHED ||
                          season.state == SeasonState.AIRING
+
+    // Determine button text based on episode watched status
+    val showUnmarkButton = isWatched || isFullyWatched
 
     Card(
         modifier = Modifier
@@ -390,9 +484,10 @@ private fun SeasonCard(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
+                    // Show watched/total episodes
                     Text(
-                        text = "${season.episodeCount} episodes",
-                        color = OnBackgroundSubtle,
+                        text = "${seasonDetail.watchedCount} / ${seasonDetail.totalEpisodes} episodes",
+                        color = if (isFullyWatched) Primary else OnBackgroundSubtle,
                         fontSize = 13.sp
                     )
                 }
@@ -410,8 +505,8 @@ private fun SeasonCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isWatched) "Unmark as Watched" else "Mark as Watched",
-                        color = if (isWatched) StateWatched else Primary,
+                        text = if (showUnmarkButton) "Unmark as Watched" else "Mark as Watched",
+                        color = if (showUnmarkButton) StateWatched else Primary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -542,6 +637,48 @@ private fun MarkWatchedDialog(
                 Text(
                     text = if (isWatched) "Unmark" else "Mark Watched",
                     color = Primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancel",
+                    color = OnBackgroundMuted
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun UnfollowShowDialog(
+    showTitle: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceVariant,
+        titleContentColor = OnBackground,
+        textContentColor = OnBackgroundMuted,
+        title = {
+            Text(
+                text = "Unfollow Show?",
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Text(
+                text = "Remove \"$showTitle\" from your followed shows? This will also remove all watched progress."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = "Unfollow",
+                    color = Destructive,
                     fontWeight = FontWeight.SemiBold
                 )
             }
