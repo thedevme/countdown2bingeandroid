@@ -62,6 +62,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
+
     // Retrofit + Moshi
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.moshi)
