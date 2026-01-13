@@ -20,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +55,7 @@ import io.designtoswiftui.countdown2binge.viewmodels.BingeReadyViewModel
 /**
  * Binge Ready screen showing seasons that are complete and ready to watch.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BingeReadyScreen(
     viewModel: BingeReadyViewModel = hiltViewModel(),
@@ -61,6 +64,7 @@ fun BingeReadyScreen(
     val bingeReadySeasons by viewModel.bingeReadySeasons.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isEmpty by viewModel.isEmpty.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Box(
         modifier = Modifier
@@ -75,12 +79,18 @@ fun BingeReadyScreen(
                 EmptyState()
             }
             else -> {
-                BingeReadyContent(
-                    seasons = bingeReadySeasons,
-                    onSeasonClick = onSeasonClick,
-                    onMarkWatched = viewModel::markSeasonWatched,
-                    onUnmarkWatched = viewModel::unmarkSeasonWatched
-                )
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = viewModel::refreshFromNetwork,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    BingeReadyContent(
+                        seasons = bingeReadySeasons,
+                        onSeasonClick = onSeasonClick,
+                        onMarkWatched = viewModel::markSeasonWatched,
+                        onUnmarkWatched = viewModel::unmarkSeasonWatched
+                    )
+                }
             }
         }
     }

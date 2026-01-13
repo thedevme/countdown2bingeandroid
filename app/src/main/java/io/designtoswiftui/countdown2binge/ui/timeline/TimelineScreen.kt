@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +47,7 @@ import io.designtoswiftui.countdown2binge.viewmodels.TimelineViewModel
 /**
  * Timeline screen showing shows grouped by their current state.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel(),
@@ -55,6 +58,7 @@ fun TimelineScreen(
     val anticipatedShows by viewModel.anticipatedShows.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isEmpty by viewModel.isEmpty.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Box(
         modifier = Modifier
@@ -69,12 +73,18 @@ fun TimelineScreen(
                 EmptyState()
             }
             else -> {
-                TimelineContent(
-                    airingShows = airingShows,
-                    premieringShows = premieringShows,
-                    anticipatedShows = anticipatedShows,
-                    onShowClick = onShowClick
-                )
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = viewModel::refreshFromNetwork,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    TimelineContent(
+                        airingShows = airingShows,
+                        premieringShows = premieringShows,
+                        anticipatedShows = anticipatedShows,
+                        onShowClick = onShowClick
+                    )
+                }
             }
         }
     }

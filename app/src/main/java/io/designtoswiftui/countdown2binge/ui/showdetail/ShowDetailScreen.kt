@@ -18,8 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -141,6 +142,7 @@ fun ShowDetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShowDetailContent(
     show: Show,
@@ -158,52 +160,56 @@ private fun ShowDetailContent(
     var selectedSeasonForDialog by remember { mutableStateOf<SeasonDetail?>(null) }
     var showUnfollowDialog by remember { mutableStateOf(false) }
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize()
     ) {
-        // Hero backdrop header
-        item {
-            HeroHeader(
-                show = show,
-                isRefreshing = isRefreshing,
-                onBackClick = onBackClick,
-                onRefresh = onRefresh
-            )
-        }
-
-        // Show info section
-        item {
-            ShowInfoSection(
-                show = show,
-                onUnfollowClick = { showUnfollowDialog = true }
-            )
-        }
-
-        // Seasons header
-        if (seasons.isNotEmpty()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Hero backdrop header
             item {
-                SeasonsHeader(count = seasons.size)
+                HeroHeader(
+                    show = show,
+                    onBackClick = onBackClick
+                )
             }
-        }
 
-        // Season cards
-        items(
-            items = seasons,
-            key = { it.season.id }
-        ) { seasonDetail ->
-            SeasonCard(
-                seasonDetail = seasonDetail,
-                onClick = { onSeasonClick(seasonDetail.season.id) },
-                onWatchedClick = {
-                    selectedSeasonForDialog = seasonDetail
-                    showWatchedDialog = true
+            // Show info section
+            item {
+                ShowInfoSection(
+                    show = show,
+                    onUnfollowClick = { showUnfollowDialog = true }
+                )
+            }
+
+            // Seasons header
+            if (seasons.isNotEmpty()) {
+                item {
+                    SeasonsHeader(count = seasons.size)
                 }
-            )
-        }
+            }
 
-        // Bottom spacing
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
+            // Season cards
+            items(
+                items = seasons,
+                key = { it.season.id }
+            ) { seasonDetail ->
+                SeasonCard(
+                    seasonDetail = seasonDetail,
+                    onClick = { onSeasonClick(seasonDetail.season.id) },
+                    onWatchedClick = {
+                        selectedSeasonForDialog = seasonDetail
+                        showWatchedDialog = true
+                    }
+                )
+            }
+
+            // Bottom spacing
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 
@@ -248,9 +254,7 @@ private fun ShowDetailContent(
 @Composable
 private fun HeroHeader(
     show: Show,
-    isRefreshing: Boolean,
-    onBackClick: () -> Unit,
-    onRefresh: () -> Unit
+    onBackClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -283,42 +287,18 @@ private fun HeroHeader(
                 )
         )
 
-        // Top row with back and refresh buttons
-        Row(
+        // Back button
+        IconButton(
+            onClick = onBackClick,
             modifier = Modifier
-                .fillMaxWidth()
                 .align(Alignment.TopStart)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(8.dp)
         ) {
-            // Back button
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = OnBackground
-                )
-            }
-
-            // Refresh button
-            IconButton(
-                onClick = onRefresh,
-                enabled = !isRefreshing
-            ) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = OnBackground,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = OnBackground
-                    )
-                }
-            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = OnBackground
+            )
         }
 
         // Title overlay at bottom

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.designtoswiftui.countdown2binge.models.Season
 import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
+import io.designtoswiftui.countdown2binge.services.RefreshService
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
 import java.time.LocalDate
@@ -35,7 +36,8 @@ data class BingeReadySeason(
 @HiltViewModel
 class BingeReadyViewModel @Inject constructor(
     private val repository: ShowRepository,
-    private val stateManager: SeasonStateManager
+    private val stateManager: SeasonStateManager,
+    private val refreshService: RefreshService
 ) : ViewModel() {
 
     // Binge-ready seasons with their shows
@@ -49,6 +51,10 @@ class BingeReadyViewModel @Inject constructor(
     // Whether the list is empty
     private val _isEmpty = MutableStateFlow(false)
     val isEmpty: StateFlow<Boolean> = _isEmpty.asStateFlow()
+
+    // Refreshing state for pull-to-refresh
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
         loadBingeReadySeasons()
@@ -97,10 +103,28 @@ class BingeReadyViewModel @Inject constructor(
     }
 
     /**
-     * Refresh the binge-ready list.
+     * Refresh the binge-ready list from local database.
      */
     fun refresh() {
         loadBingeReadySeasons()
+    }
+
+    /**
+     * Refresh all shows from TMDB network.
+     * Used for pull-to-refresh.
+     */
+    fun refreshFromNetwork() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+
+            // Refresh all shows from TMDB
+            refreshService.refreshAllShows()
+
+            // Reload local data
+            loadBingeReadySeasons()
+
+            _isRefreshing.value = false
+        }
     }
 
     /**
