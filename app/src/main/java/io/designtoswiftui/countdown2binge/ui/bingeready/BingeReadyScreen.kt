@@ -369,7 +369,7 @@ private fun SeasonCard(
                         }
                         dragOffset = 0f
                     },
-                    onDrag = { _, dragAmount ->
+                    onVerticalDrag = { _, dragAmount ->
                         dragOffset += dragAmount
                     }
                 )
