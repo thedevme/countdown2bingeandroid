@@ -2,7 +2,6 @@ package io.designtoswiftui.countdown2binge.ui.bingeready
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,15 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,14 +33,13 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -77,8 +74,8 @@ private data class ShowWithSeasons(
 )
 
 /**
- * Binge Ready screen showing seasons grouped by show with horizontal paging.
- * Matches iOS design: vertical list of shows, horizontal pager of seasons per show.
+ * Binge Ready screen showing seasons grouped by show with horizontal scrolling.
+ * Matches iOS design: vertical list of shows, horizontal scroll of seasons per show.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,7 +186,7 @@ private fun ShowSeasonStack(
     onRemoveShow: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-    val pagerState = rememberPagerState(pageCount = { showWithSeasons.seasons.size })
+    var currentPage by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -206,54 +203,29 @@ private fun ShowSeasonStack(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        // Horizontal pager for seasons
-        Box(
-            modifier = Modifier.fillMaxWidth()
+        // Horizontal scroll for seasons
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                pageSpacing = 12.dp
-            ) { page ->
-                val season = showWithSeasons.seasons[page]
+            itemsIndexed(
+                items = showWithSeasons.seasons,
+                key = { _, season -> season.season.id }
+            ) { index, season ->
                 SeasonCard(
                     bingeReadySeason = season,
                     onClick = { onSeasonClick(season.show.id) },
-                    onSwipeDown = {
+                    onComplete = {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         onMarkWatched(season.season.id)
                     },
-                    onSwipeUp = {
+                    onRemove = {
                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         onRemoveShow()
-                    }
+                    },
+                    modifier = Modifier.fillParentMaxWidth(0.85f)
                 )
-            }
-
-            // Next season indicator (if more seasons exist)
-            if (showWithSeasons.seasons.size > 1 && pagerState.currentPage < showWithSeasons.seasons.size - 1) {
-                val nextSeason = showWithSeasons.seasons.getOrNull(pagerState.currentPage + 1)
-                if (nextSeason != null) {
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "S${nextSeason.season.seasonNumber}",
-                            color = OnBackgroundMuted,
-                            fontSize = 12.sp
-                        )
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowRight,
-                            contentDescription = "Next season",
-                            tint = OnBackgroundMuted,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
             }
         }
 
@@ -272,7 +244,7 @@ private fun ShowSeasonStack(
                             .size(6.dp)
                             .clip(CircleShape)
                             .background(
-                                if (index == pagerState.currentPage)
+                                if (index == 0)
                                     OnBackground
                                 else
                                     OnBackgroundSubtle
@@ -282,64 +254,66 @@ private fun ShowSeasonStack(
             }
         }
 
-        // Action buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            // Complete button
+        // Action buttons for the first (current) season
+        val currentSeason = showWithSeasons.seasons.firstOrNull()
+        if (currentSeason != null) {
             Row(
                 modifier = Modifier
-                    .clickable {
-                        val currentSeason = showWithSeasons.seasons[pagerState.currentPage]
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onMarkWatched(currentSeason.season.id)
-                    }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = StateBingeReady,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Complete",
-                    color = StateBingeReady,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                // Complete button
+                Row(
+                    modifier = Modifier
+                        .clickable {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onMarkWatched(currentSeason.season.id)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = StateBingeReady,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Complete",
+                        color = StateBingeReady,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
 
-            Spacer(modifier = Modifier.width(32.dp))
+                Spacer(modifier = Modifier.width(32.dp))
 
-            // Remove button
-            Row(
-                modifier = Modifier
-                    .clickable {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onRemoveShow()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = null,
-                    tint = Destructive,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Remove",
-                    color = Destructive,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                // Remove button
+                Row(
+                    modifier = Modifier
+                        .clickable {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onRemoveShow()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Destructive,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Remove",
+                        color = Destructive,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
@@ -349,31 +323,15 @@ private fun ShowSeasonStack(
 private fun SeasonCard(
     bingeReadySeason: BingeReadySeason,
     onClick: () -> Unit,
-    onSwipeDown: () -> Unit,
-    onSwipeUp: () -> Unit
+    onComplete: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val show = bingeReadySeason.show
     val season = bingeReadySeason.season
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val swipeThreshold = 100f
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragOffset > swipeThreshold -> onSwipeDown()
-                            dragOffset < -swipeThreshold -> onSwipeUp()
-                        }
-                        dragOffset = 0f
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
-                    }
-                )
-            }
+        modifier = modifier
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
