@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.designtoswiftui.countdown2binge.models.Season
+import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
@@ -120,6 +121,62 @@ class ShowDetailViewModel @Inject constructor(
     fun refresh() {
         if (showId > 0) {
             loadShow()
+        }
+    }
+
+    /**
+     * Mark a season as watched.
+     */
+    fun markSeasonWatched(seasonId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.markSeasonWatched(seasonId)
+                // Reload seasons to reflect the change
+                _show.value?.let { loadSeasons(it.id) }
+            } catch (e: Exception) {
+                _error.value = "Failed to mark as watched: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Unmark a season as watched (revert to appropriate state).
+     */
+    fun unmarkSeasonWatched(seasonId: Long) {
+        viewModelScope.launch {
+            try {
+                // Find the season to determine its proper state
+                val seasonDetail = _seasons.value.find { it.season.id == seasonId }
+                val season = seasonDetail?.season
+
+                // Determine the new state based on dates
+                val newState = if (season != null) {
+                    stateManager.determineState(
+                        season.copy(watchedDate = null),
+                        LocalDate.now()
+                    )
+                } else {
+                    SeasonState.BINGE_READY
+                }
+
+                repository.unmarkSeasonWatched(seasonId, newState)
+                // Reload seasons to reflect the change
+                _show.value?.let { loadSeasons(it.id) }
+            } catch (e: Exception) {
+                _error.value = "Failed to unmark as watched: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Toggle the watched state of a season.
+     */
+    fun toggleSeasonWatched(seasonId: Long) {
+        val seasonDetail = _seasons.value.find { it.season.id == seasonId }
+        if (seasonDetail?.season?.state == SeasonState.WATCHED) {
+            unmarkSeasonWatched(seasonId)
+        } else {
+            markSeasonWatched(seasonId)
         }
     }
 }

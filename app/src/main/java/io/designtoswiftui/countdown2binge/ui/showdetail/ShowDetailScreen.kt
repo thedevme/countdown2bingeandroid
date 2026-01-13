@@ -17,16 +17,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +62,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundMuted
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
 import io.designtoswiftui.countdown2binge.ui.theme.Primary
+import io.designtoswiftui.countdown2binge.ui.theme.StateWatched
 import io.designtoswiftui.countdown2binge.ui.theme.Surface
 import io.designtoswiftui.countdown2binge.ui.theme.SurfaceVariant
 import io.designtoswiftui.countdown2binge.viewmodels.SeasonDetail
@@ -101,7 +107,9 @@ fun ShowDetailScreen(
                     show = show!!,
                     seasons = seasons,
                     onBackClick = onBackClick,
-                    onSeasonClick = onSeasonClick
+                    onSeasonClick = onSeasonClick,
+                    onMarkWatched = viewModel::markSeasonWatched,
+                    onUnmarkWatched = viewModel::unmarkSeasonWatched
                 )
             }
         }
@@ -113,8 +121,14 @@ private fun ShowDetailContent(
     show: Show,
     seasons: List<SeasonDetail>,
     onBackClick: () -> Unit,
-    onSeasonClick: (Long) -> Unit
+    onSeasonClick: (Long) -> Unit,
+    onMarkWatched: (Long) -> Unit,
+    onUnmarkWatched: (Long) -> Unit
 ) {
+    // State for confirmation dialog
+    var showWatchedDialog by remember { mutableStateOf(false) }
+    var selectedSeasonForDialog by remember { mutableStateOf<SeasonDetail?>(null) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -145,7 +159,11 @@ private fun ShowDetailContent(
         ) { seasonDetail ->
             SeasonCard(
                 seasonDetail = seasonDetail,
-                onClick = { onSeasonClick(seasonDetail.season.id) }
+                onClick = { onSeasonClick(seasonDetail.season.id) },
+                onWatchedClick = {
+                    selectedSeasonForDialog = seasonDetail
+                    showWatchedDialog = true
+                }
             )
         }
 
@@ -153,6 +171,31 @@ private fun ShowDetailContent(
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Confirmation dialog
+    if (showWatchedDialog && selectedSeasonForDialog != null) {
+        val season = selectedSeasonForDialog!!.season
+        val isWatched = season.state == SeasonState.WATCHED
+
+        MarkWatchedDialog(
+            seasonNumber = season.seasonNumber,
+            showTitle = show.title,
+            isWatched = isWatched,
+            onConfirm = {
+                if (isWatched) {
+                    onUnmarkWatched(season.id)
+                } else {
+                    onMarkWatched(season.id)
+                }
+                showWatchedDialog = false
+                selectedSeasonForDialog = null
+            },
+            onDismiss = {
+                showWatchedDialog = false
+                selectedSeasonForDialog = null
+            }
+        )
     }
 }
 
@@ -292,9 +335,14 @@ private fun SeasonsHeader(count: Int) {
 @Composable
 private fun SeasonCard(
     seasonDetail: SeasonDetail,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onWatchedClick: () -> Unit
 ) {
     val season = seasonDetail.season
+    val isWatched = season.state == SeasonState.WATCHED
+    val canMarkWatched = season.state == SeasonState.BINGE_READY ||
+                         season.state == SeasonState.WATCHED ||
+                         season.state == SeasonState.AIRING
 
     Card(
         modifier = Modifier
@@ -309,45 +357,66 @@ private fun SeasonCard(
         ),
         onClick = onClick
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(16.dp)
         ) {
-            // Left side: Season info
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Left side: Season info
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "Season ${season.seasonNumber}",
-                        color = OnBackground,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Season ${season.seasonNumber}",
+                            color = OnBackground,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
 
-                    StateBadge(
-                        state = season.state,
-                        showDot = true
+                        StateBadge(
+                            state = season.state,
+                            showDot = true
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "${season.episodeCount} episodes",
+                        color = OnBackgroundSubtle,
+                        fontSize = 13.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "${season.episodeCount} episodes",
-                    color = OnBackgroundSubtle,
-                    fontSize = 13.sp
-                )
+                // Right side: Countdown or watched indicator
+                SeasonCountdown(seasonDetail = seasonDetail)
             }
 
-            // Right side: Countdown
-            SeasonCountdown(seasonDetail = seasonDetail)
+            // Mark as Watched button
+            if (canMarkWatched) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = onWatchedClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (isWatched) "Unmark as Watched" else "Mark as Watched",
+                        color = if (isWatched) StateWatched else Primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
@@ -438,6 +507,54 @@ private fun ErrorState(
             )
         }
     }
+}
+
+@Composable
+private fun MarkWatchedDialog(
+    seasonNumber: Int,
+    showTitle: String,
+    isWatched: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceVariant,
+        titleContentColor = OnBackground,
+        textContentColor = OnBackgroundMuted,
+        title = {
+            Text(
+                text = if (isWatched) "Unmark as Watched?" else "Mark as Watched?",
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Text(
+                text = if (isWatched) {
+                    "Remove Season $seasonNumber of $showTitle from your watched list?"
+                } else {
+                    "Mark Season $seasonNumber of $showTitle as watched?"
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = if (isWatched) "Unmark" else "Mark Watched",
+                    color = Primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancel",
+                    color = OnBackgroundMuted
+                )
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)
