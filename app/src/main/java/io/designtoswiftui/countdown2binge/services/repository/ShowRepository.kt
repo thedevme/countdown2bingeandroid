@@ -46,6 +46,16 @@ class ShowRepository @Inject constructor(
     }
 
     /**
+     * Delete a show by its ID.
+     */
+    suspend fun deleteShow(showId: Long) {
+        val show = getShowById(showId)
+        if (show != null) {
+            delete(show)
+        }
+    }
+
+    /**
      * Get all shows ordered by added date.
      */
     fun getAllShows(): Flow<List<Show>> {

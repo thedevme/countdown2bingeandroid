@@ -179,4 +179,14 @@ class BingeReadyViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Unfollow/remove a show entirely.
+     */
+    fun unfollowShow(showId: Long) {
+        viewModelScope.launch {
+            repository.deleteShow(showId)
+            // List will auto-refresh via Flow collection
+        }
+    }
 }

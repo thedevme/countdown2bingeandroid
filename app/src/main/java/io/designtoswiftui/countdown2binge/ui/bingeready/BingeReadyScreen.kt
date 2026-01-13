@@ -17,21 +17,30 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -39,6 +48,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
+import io.designtoswiftui.countdown2binge.ui.components.BingeReadyStackCard
+import io.designtoswiftui.countdown2binge.ui.components.CardStack
 import io.designtoswiftui.countdown2binge.ui.theme.Background
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
@@ -53,7 +64,16 @@ import io.designtoswiftui.countdown2binge.viewmodels.BingeReadySeason
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadyViewModel
 
 /**
+ * View mode for the Binge Ready screen
+ */
+private enum class ViewMode {
+    Stack,
+    List
+}
+
+/**
  * Binge Ready screen showing seasons that are complete and ready to watch.
+ * Supports both card stack (swipe) and list view modes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +85,8 @@ fun BingeReadyScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isEmpty by viewModel.isEmpty.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+
+    var viewMode by remember { mutableStateOf(ViewMode.Stack) }
 
     Box(
         modifier = Modifier
@@ -79,17 +101,44 @@ fun BingeReadyScreen(
                 EmptyState()
             }
             else -> {
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = viewModel::refreshFromNetwork,
+                Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    BingeReadyContent(
-                        seasons = bingeReadySeasons,
-                        onSeasonClick = onSeasonClick,
-                        onMarkWatched = viewModel::markSeasonWatched,
-                        onUnmarkWatched = viewModel::unmarkSeasonWatched
+                    // Header with view toggle
+                    BingeReadyHeader(
+                        count = bingeReadySeasons.size,
+                        viewMode = viewMode,
+                        onViewModeToggle = {
+                            viewMode = if (viewMode == ViewMode.Stack) ViewMode.List else ViewMode.Stack
+                        }
                     )
+
+                    // Content based on view mode
+                    when (viewMode) {
+                        ViewMode.Stack -> {
+                            CardStackView(
+                                seasons = bingeReadySeasons,
+                                onMarkWatched = viewModel::markSeasonWatched,
+                                onSkip = { /* Skip just moves to next card */ },
+                                onEmpty = { viewMode = ViewMode.List },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        ViewMode.List -> {
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = viewModel::refreshFromNetwork,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                BingeReadyListContent(
+                                    seasons = bingeReadySeasons,
+                                    onSeasonClick = onSeasonClick,
+                                    onMarkWatched = viewModel::markSeasonWatched,
+                                    onUnmarkWatched = viewModel::unmarkSeasonWatched
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -97,7 +146,121 @@ fun BingeReadyScreen(
 }
 
 @Composable
-private fun BingeReadyContent(
+private fun CardStackView(
+    seasons: List<BingeReadySeason>,
+    onMarkWatched: (Long) -> Unit,
+    onSkip: (Long) -> Unit,
+    onEmpty: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Filter out already fully watched seasons and sort by season number (most recent first)
+    val unwatchedSeasons = seasons
+        .filter { !it.isFullyWatched }
+        .sortedByDescending { it.season.seasonNumber }
+
+    if (unwatchedSeasons.isEmpty()) {
+        // All done state
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(
+                            color = StateBingeReady.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(20.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "🎉",
+                        fontSize = 36.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "All caught up!",
+                    color = OnBackground,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "You've gone through all your binge-ready seasons",
+                    color = OnBackgroundMuted,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    } else {
+        CardStack(
+            items = unwatchedSeasons,
+            onSwipeLeft = { season ->
+                onSkip(season.season.id)
+            },
+            onSwipeRight = { season ->
+                onMarkWatched(season.season.id)
+            },
+            onEmpty = onEmpty,
+            modifier = modifier.padding(vertical = 16.dp)
+        ) { season ->
+            BingeReadyStackCard(bingeReadySeason = season)
+        }
+    }
+}
+
+@Composable
+private fun BingeReadyHeader(
+    count: Int,
+    viewMode: ViewMode,
+    onViewModeToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 16.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "Binge Ready",
+                color = OnBackground,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "$count ${if (count == 1) "season" else "seasons"} ready to watch",
+                color = OnBackgroundMuted,
+                fontSize = 14.sp
+            )
+        }
+
+        // View mode toggle
+        IconButton(onClick = onViewModeToggle) {
+            Icon(
+                imageVector = if (viewMode == ViewMode.Stack) Icons.Default.List else Icons.Default.PlayArrow,
+                contentDescription = if (viewMode == ViewMode.Stack) "Switch to list view" else "Switch to stack view",
+                tint = OnBackgroundMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun BingeReadyListContent(
     seasons: List<BingeReadySeason>,
     onSeasonClick: (Long) -> Unit,
     onMarkWatched: (Long) -> Unit,
@@ -107,17 +270,11 @@ private fun BingeReadyContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // Header
-        item {
-            BingeReadyHeader(count = seasons.size)
-        }
-
-        // Season items
         items(
             items = seasons,
             key = { "${it.show.id}_${it.season.id}" }
         ) { bingeReadySeason ->
-            BingeReadyItem(
+            BingeReadyListItem(
                 bingeReadySeason = bingeReadySeason,
                 onClick = { onSeasonClick(bingeReadySeason.show.id) },
                 onMarkWatched = { onMarkWatched(bingeReadySeason.season.id) },
@@ -128,30 +285,7 @@ private fun BingeReadyContent(
 }
 
 @Composable
-private fun BingeReadyHeader(count: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 16.dp, bottom = 8.dp)
-    ) {
-        Text(
-            text = "Binge Ready",
-            color = OnBackground,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "$count ${if (count == 1) "season" else "seasons"} ready to watch",
-            color = OnBackgroundMuted,
-            fontSize = 14.sp
-        )
-    }
-}
-
-@Composable
-private fun BingeReadyItem(
+private fun BingeReadyListItem(
     bingeReadySeason: BingeReadySeason,
     onClick: () -> Unit,
     onMarkWatched: () -> Unit,
@@ -341,7 +475,7 @@ private fun EmptyState() {
                 fontSize = 14.sp,
                 modifier = Modifier.padding(horizontal = 32.dp),
                 lineHeight = 20.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
     }

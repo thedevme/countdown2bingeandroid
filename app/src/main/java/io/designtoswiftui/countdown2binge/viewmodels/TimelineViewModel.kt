@@ -209,4 +209,14 @@ class TimelineViewModel @Inject constructor(
             _isRefreshing.value = false
         }
     }
+
+    /**
+     * Unfollow/remove a show from the user's list.
+     */
+    fun unfollowShow(showId: Long) {
+        viewModelScope.launch {
+            repository.deleteShow(showId)
+            // List will auto-refresh via Flow collection
+        }
+    }
 }
