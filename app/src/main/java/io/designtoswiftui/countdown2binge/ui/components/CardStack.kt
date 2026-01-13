@@ -144,14 +144,9 @@ private fun <T> StackCard(
     // Rotation based on drag (only for top card)
     val rotation = if (isTopCard) (offsetX.value / screenWidthPx) * 15f else 0f
 
-    // Opacity for swipe indicators
-    val swipeProgress = abs(offsetX.value) / swipeThreshold
-    val showingLeftIndicator = offsetX.value < -swipeThreshold * 0.3f
-    val showingRightIndicator = offsetX.value > swipeThreshold * 0.3f
-
     Box(
         modifier = Modifier
-            .offset { IntOffset(offsetX.value.roundToInt(), offsetY + offsetY.roundToInt()) }
+            .offset { IntOffset(offsetX.value.roundToInt(), yOffset + offsetY.value.roundToInt()) }
             .scale(scale)
             .graphicsLayer {
                 rotationZ = rotation
