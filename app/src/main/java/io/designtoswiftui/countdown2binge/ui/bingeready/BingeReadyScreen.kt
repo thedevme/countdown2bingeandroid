@@ -1,7 +1,9 @@
 package io.designtoswiftui.countdown2binge.ui.bingeready
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,18 +13,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,21 +37,29 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
@@ -63,6 +75,8 @@ import io.designtoswiftui.countdown2binge.ui.theme.Surface
 import io.designtoswiftui.countdown2binge.ui.theme.SurfaceVariant
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadySeason
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadyViewModel
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 /**
  * Data class to group seasons by show for the card stack
@@ -74,8 +88,8 @@ private data class ShowWithSeasons(
 )
 
 /**
- * Binge Ready screen showing seasons grouped by show with horizontal scrolling.
- * Matches iOS design: vertical list of shows, horizontal scroll of seasons per show.
+ * Binge Ready screen showing seasons grouped by show with stacked cards.
+ * Matches iOS design: vertical list of shows, stacked swipeable cards per show.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,7 +157,7 @@ private fun BingeReadyContent(
     ) {
         // Header
         item {
-            BingeReadyHeader(count = seasons.size)
+            BingeReadyHeader()
         }
 
         // Show stacks
@@ -162,7 +176,7 @@ private fun BingeReadyContent(
 }
 
 @Composable
-private fun BingeReadyHeader(count: Int) {
+private fun BingeReadyHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,12 +200,18 @@ private fun ShowSeasonStack(
     onRemoveShow: () -> Unit
 ) {
     val hapticFeedback = LocalHapticFeedback.current
-    var currentPage by remember { mutableIntStateOf(0) }
+    var currentIndex by remember { mutableIntStateOf(0) }
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val swipeThreshold = screenWidthPx * 0.3f
+
+    var dragOffset by remember { mutableFloatStateOf(0f) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 16.dp)
     ) {
         // Section header
         Text(
@@ -203,48 +223,85 @@ private fun ShowSeasonStack(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        // Horizontal scroll for seasons
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Stacked cards
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .padding(horizontal = 16.dp)
+                .pointerInput(showWithSeasons.seasons.size, currentIndex) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            when {
+                                dragOffset > swipeThreshold && currentIndex < showWithSeasons.seasons.size - 1 -> {
+                                    // Swipe right - go to next (older) season
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentIndex++
+                                }
+                                dragOffset < -swipeThreshold && currentIndex > 0 -> {
+                                    // Swipe left - go to previous (newer) season
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentIndex--
+                                }
+                            }
+                            dragOffset = 0f
+                        },
+                        onHorizontalDrag = { _, amount ->
+                            dragOffset += amount
+                        }
+                    )
+                }
         ) {
-            itemsIndexed(
-                items = showWithSeasons.seasons,
-                key = { _, season -> season.season.id }
-            ) { index, season ->
+            // Render stacked cards (show up to 3 behind current)
+            val visibleRange = (currentIndex until minOf(currentIndex + 3, showWithSeasons.seasons.size))
+
+            visibleRange.reversed().forEach { index ->
+                val stackPosition = index - currentIndex
+                val season = showWithSeasons.seasons[index]
+
+                // Calculate offset and scale for stacking effect
+                val offsetX = if (stackPosition == 0) dragOffset else 0f
+                val scale = 1f - (stackPosition * 0.05f)
+                val yOffset = stackPosition * 8
+                val alpha = 1f - (stackPosition * 0.2f)
+
                 SeasonCard(
                     bingeReadySeason = season,
                     onClick = { onSeasonClick(season.show.id) },
-                    onComplete = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onMarkWatched(season.season.id)
-                    },
-                    onRemove = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onRemoveShow()
-                    },
-                    modifier = Modifier.fillParentMaxWidth(0.85f)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .zIndex((10 - stackPosition).toFloat())
+                        .offset { IntOffset(offsetX.roundToInt(), yOffset) }
+                        .scale(scale)
+                        .graphicsLayer { this.alpha = alpha }
                 )
             }
         }
 
-        // Page indicators
-        if (showWithSeasons.seasons.size > 1) {
+        // Page dots and next season indicator
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp, start = 16.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Empty spacer for alignment
+            Spacer(modifier = Modifier.width(48.dp))
+
+            // Page dots
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f)
             ) {
                 repeat(showWithSeasons.seasons.size) { index ->
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 3.dp)
-                            .size(6.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
                             .background(
-                                if (index == 0)
+                                if (index == currentIndex)
                                     OnBackground
                                 else
                                     OnBackgroundSubtle
@@ -252,10 +309,32 @@ private fun ShowSeasonStack(
                     )
                 }
             }
+
+            // Next season indicator
+            if (currentIndex < showWithSeasons.seasons.size - 1) {
+                val nextSeason = showWithSeasons.seasons[currentIndex + 1]
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "S${nextSeason.season.seasonNumber}",
+                        color = OnBackgroundMuted,
+                        fontSize = 14.sp
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowRight,
+                        contentDescription = "Next season",
+                        tint = OnBackgroundMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(48.dp))
+            }
         }
 
-        // Action buttons for the first (current) season
-        val currentSeason = showWithSeasons.seasons.firstOrNull()
+        // Action buttons
+        val currentSeason = showWithSeasons.seasons.getOrNull(currentIndex)
         if (currentSeason != null) {
             Row(
                 modifier = Modifier
@@ -263,7 +342,7 @@ private fun ShowSeasonStack(
                     .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
-                // Complete button
+                // Complete button (swipe down)
                 Row(
                     modifier = Modifier
                         .clickable {
@@ -274,10 +353,10 @@ private fun ShowSeasonStack(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
                         tint = StateBingeReady,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
@@ -290,7 +369,7 @@ private fun ShowSeasonStack(
 
                 Spacer(modifier = Modifier.width(32.dp))
 
-                // Remove button
+                // Remove button (swipe up)
                 Row(
                     modifier = Modifier
                         .clickable {
@@ -301,10 +380,10 @@ private fun ShowSeasonStack(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Default.KeyboardArrowUp,
                         contentDescription = null,
                         tint = Destructive,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
@@ -323,8 +402,6 @@ private fun ShowSeasonStack(
 private fun SeasonCard(
     bingeReadySeason: BingeReadySeason,
     onClick: () -> Unit,
-    onComplete: () -> Unit,
-    onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val show = bingeReadySeason.show
