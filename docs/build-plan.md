@@ -496,20 +496,42 @@ A sequential execution checklist optimized for **early Play Store builds**.
 
 ---
 
-## Phase 25: Onboarding
+## Phase 25: Enhanced Onboarding (iOS Parity)
 
-### 25.1 — Create Onboarding Flow
-- [ ] 212. Create `ui/onboarding/OnboardingScreen.kt`
-- [ ] 213. Page 1: Welcome + value prop
-- [ ] 214. Page 2: How it works
-- [ ] 215. Page 3: Add your first show
-- [ ] 216. HorizontalPager with indicators
+### 25.1 — Create Onboarding Container
+- [ ] 212. Create `ui/onboarding/OnboardingContainer.kt`
+- [ ] 213. Track onboarding state: step, selectedShows, hasShownNotifications
+- [ ] 214. Back button navigation between steps
+- [ ] 215. Skip functionality at every step
 
-### 25.2 — First Launch
-- [ ] 217. Track first launch in DataStore
-- [ ] 218. Show onboarding only on first launch
-- [ ] 219. Skip option
-- [ ] 220. Complete → go to Search
+### 25.2 — Add Shows Screen
+- [ ] 216. Create `ui/onboarding/AddShowsScreen.kt`
+- [ ] 217. Tab bar: Recommended | Search (segmented style)
+- [ ] 218. Load recommended/trending shows on appear
+- [ ] 219. Search with debounce (auto-switch to Search tab)
+- [ ] 220. Show cards with bookmark + count badge for selection
+- [ ] 221. Continue button (always enabled, allows skip)
+- [ ] 222. Show notification settings sheet on first show added
+
+### 25.3 — Review Shows Screen
+- [ ] 223. Create `ui/onboarding/ReviewShowsScreen.kt`
+- [ ] 224. Grid of selected shows with posters
+- [ ] 225. Swipe to remove shows
+- [ ] 226. Skip if no shows selected → go to completion
+- [ ] 227. Confirm selection button
+
+### 25.4 — Completion Screen
+- [ ] 228. Create `ui/onboarding/CompletionScreen.kt`
+- [ ] 229. Success message with animation
+- [ ] 230. Google Assistant shortcuts education (Learn button)
+- [ ] 231. "Start Watching" button → dismiss immediately, save in background
+- [ ] 232. Back button to return to step 1
+
+### 25.5 — First Launch Logic
+- [ ] 233. Track completion state in DataStore
+- [ ] 234. Track voice assistant education shown
+- [ ] 235. Skip onboarding in UI tests
+- [ ] 236. Handle existing users (show voice assistant only)
 
 ---
 
@@ -539,23 +561,88 @@ A sequential execution checklist optimized for **early Play Store builds**.
 
 ---
 
-## Phase 28: Notifications
+## Phase 28: Notifications Service
 
 ### 28.1 — Notification Setup
-- [ ] 231. Add notification permission handling (Android 13+)
-- [ ] 232. Create `services/NotificationManager.kt`
-- [ ] 233. Create notification channels
+- [ ] 237. Add notification permission handling (Android 13+)
+- [ ] 238. Create `services/NotificationService.kt`
+- [ ] 239. Create notification channels (premiere, finale, bingeReady)
 
 ### 28.2 — Notification Types
-- [ ] 234. Binge Ready notification
-- [ ] 235. Premiere reminder
-- [ ] 236. Finale reminder
+- [ ] 240. Binge Ready notification (day after finale)
+- [ ] 241. Premiere reminder (9 AM on premiere day)
+- [ ] 242. Finale reminder with timing options (day of, 1 day, 2 days, 1 week)
+- [ ] 243. New episode notifications
 
 ### 28.3 — Schedule Notifications
-- [ ] 237. Request permission after first show added
-- [ ] 238. Schedule with AlarmManager or WorkManager
-- [ ] 239. Cancel when show removed
-- [ ] 240. Respect user preferences
+- [ ] 244. Schedule with AlarmManager or WorkManager
+- [ ] 245. Cancel notifications when show removed
+- [ ] 246. Reschedule on data refresh
+- [ ] 247. Skip scheduling for non-production shows
+
+### 28.4 — Notification Settings Model
+- [ ] 248. Create `models/NotificationSettings.kt`
+- [ ] 249. Global defaults: seasonPremiere, newEpisodes, finaleReminder, bingeReady
+- [ ] 250. Finale reminder timing enum
+- [ ] 251. Quiet hours (start/end times)
+- [ ] 252. Per-show settings override
+
+---
+
+## Phase 28B: Notifications Hub (iOS Parity)
+
+### 28B.1 — Create ScheduledNotification Model
+- [ ] 253. Create `models/ScheduledNotification.kt`
+- [ ] 254. Properties: id, showId, showName, posterPath, type, title, subtitle
+- [ ] 255. Properties: scheduledDate, seasonNumber, episodeNumber, status
+- [ ] 256. Status enum: pending, delivered, cancelled, scheduled, queued
+- [ ] 257. NotificationType enum: premiere, newEpisode, finaleReminder, bingeReady
+
+### 28B.2 — Extend NotificationService
+- [ ] 258. `getScheduledNotifications(): List<ScheduledNotification>`
+- [ ] 259. `getScheduledNotifications(showId): List<ScheduledNotification>`
+- [ ] 260. `getPendingCount(): Int`
+- [ ] 261. `getPendingCountByType(): Map<NotificationType, Int>`
+- [ ] 262. `getNextScheduledNotification(): ScheduledNotification?`
+- [ ] 263. `cancelNotification(identifier: String)`
+- [ ] 264. `getDeliveredNotifications(): List<ScheduledNotification>`
+
+### 28B.3 — Create NotificationsViewModel
+- [ ] 265. Create `viewmodels/NotificationsViewModel.kt`
+- [ ] 266. StateFlow: permissionStatus, isPremium, pendingCount, typeBreakdown
+- [ ] 267. StateFlow: nextScheduled, scheduledNotifications, filteredNotifications
+- [ ] 268. StateFlow: globalDefaults, followedShows (in-production only)
+- [ ] 269. StateFlow: selectedFilter (pending/delivered/cancelled)
+- [ ] 270. Per-show state: showNotificationSettings, showScheduledNotifications
+- [ ] 271. Methods: loadData(), requestPermission(), openSettings()
+- [ ] 272. Methods: loadShowData(show), cancelNotification(), saveShowSettings()
+
+### 28B.4 — Hub Components
+- [ ] 273. Create `ui/notifications/SystemPermissionsCard.kt`
+- [ ] 274. Create `ui/notifications/PremiumAccessCard.kt`
+- [ ] 275. Create `ui/notifications/NotificationSummaryCard.kt` (pending + type breakdown)
+- [ ] 276. Create `ui/notifications/NextScheduledCard.kt`
+- [ ] 277. Create `ui/notifications/GlobalDefaultsSection.kt` (toggles)
+- [ ] 278. Create `ui/notifications/ShowManagementRow.kt` (poster, name, next notification)
+- [ ] 279. Create `ui/notifications/ScheduledAlertRow.kt` (type badge, details, cancel)
+
+### 28B.5 — Notifications Hub Screen
+- [ ] 280. Create `ui/notifications/NotificationsHubScreen.kt`
+- [ ] 281. ScrollView with all hub components
+- [ ] 282. Show Management section (tap → Edit screen)
+- [ ] 283. Scheduled Alerts with filter picker
+- [ ] 284. Navigation from Settings → Reminders
+
+### 28B.6 — Edit Show Notifications Screen
+- [ ] 285. Create `ui/notifications/EditShowNotificationsScreen.kt`
+- [ ] 286. Collapsing/stretchy poster header (CollapsingToolbarScaffold)
+- [ ] 287. Show info section (name, next notification, pending count)
+- [ ] 288. Notification settings toggles (override global)
+- [ ] 289. Finale timing selector (pill buttons)
+- [ ] 290. Quiet hours section with time pickers
+- [ ] 291. Scheduled alerts list for this show
+- [ ] 292. "Reset to Global Defaults" button with confirmation
+- [ ] 293. "Cancel All Notifications" button with confirmation
 
 ---
 

@@ -1,5 +1,55 @@
 ---
 
+## Slot Machine Countdown Component
+
+**CRITICAL DIRECTION RULE**: The numbers always go from LEFT to RIGHT, lowest to highest.
+- Lowest numbers on the LEFT (0, 1, 2...)
+- Highest numbers on the RIGHT (...98, 99, TBD)
+- TBD is at position 100 (far RIGHT, highest position)
+- When countdown decreases, numbers scroll LEFT (revealing lower numbers)
+- When value is nil or invalid, animate to TBD (scroll RIGHT to position 100)
+
+---
+
+## Documentation First
+
+**ALWAYS check official documentation before implementing solutions for third-party libraries and frameworks.**
+
+- Do NOT assume how APIs work based on naming or intuition
+- Do NOT try multiple guessed approaches - look up the correct solution first
+- Use Context7 or web search to find official documentation
+- This applies to: Retrofit, Room, Hilt, Coil, any Gradle dependencies, Android/Jetpack APIs, etc.
+
+---
+
+## Bug Fixing Workflow
+
+**For small bugs** (typos, simple logic errors, obvious fixes): Just fix them.
+
+**For big issues** (architectural changes, changes that affect multiple components, non-obvious fixes):
+1. **Explain what's wrong** - describe the issue clearly so the user understands it
+2. **Propose a fix** - explain what you're planning to do and why
+3. **Wait for approval** - do NOT touch any code until the user approves the approach
+
+If unsure whether something is a small bug or big issue, ask first.
+
+---
+
+## Implementation Plan Requirement
+
+**For any new feature or significant implementation**, ALWAYS provide an implementation plan BEFORE writing any code. The plan should include:
+
+1. **Files to Create** - List all new files with their purpose
+2. **Files to Modify** - List existing files that need changes
+3. **Data/State Management** - How state will be stored and shared
+4. **Navigation Flow** - How screens connect and pass data
+5. **Key Components** - Reusable components to build or leverage
+6. **Implementation Order** - Numbered steps in dependency order
+
+Wait for user approval of the plan before proceeding with implementation.
+
+---
+
 ## Countdown2Binge Project Rules (Android)
 
 - The product specification in `/docs` is the source of truth for all product behavior.
@@ -10,6 +60,18 @@
 - Core logic and tests must exist before UI work begins.
 
 ---
+
+## Deprecated APIs to Avoid
+
+**Do NOT use deprecated Android APIs.** Common ones to avoid:
+- `AsyncTask` - use Kotlin Coroutines instead
+- `LocalBroadcastManager` - use Flow or LiveData instead
+- `startActivityForResult` - use Activity Result APIs instead
+- `onActivityResult` - use registerForActivityResult instead
+
+---
+
+When making code changes, ALWAYS run `./gradlew build` or `./gradlew assembleDebug` unless explicitly instructed to skip testing. This applies when implementing a feature or fix, modifying data layer, ViewModels, shared logic, or making multi-screen updates, or when the user says things like "test this" or "let's see if it works." Do NOT run builds for single-file UI tweaks (use Compose Previews instead), when actively iterating on the same file, or when changes are limited to comments, formatting, or naming. Rely on compiler output and test results only. Do not modify signing, provisioning, credentials, or upload builds; this tool is execution-only and should surface errors clearly and immediately.
 
 When a phase completes successfully:
 - Print the line exactly: PHASE COMPLETE — READY FOR REVIEW

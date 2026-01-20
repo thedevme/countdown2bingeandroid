@@ -34,6 +34,36 @@ users should never need to remember dates, finales, or season status.
   - Quick reactions per episode or season
   - Lightweight, personal (not social media)
 
+### Onboarding Experience
+- Multi-step onboarding flow:
+  - Add your first shows (search + recommended)
+  - Review selected shows
+  - Notification settings prompt (first show added)
+  - Completion screen with voice assistant education
+- Skip option available at every step
+- Back navigation allowed
+
+### Notifications Hub
+- Central notifications management (Settings → Reminders):
+  - System permissions card (enable/open settings)
+  - Premium access card (free users see upsell)
+  - Summary: pending count + type breakdown
+  - Next scheduled notification display
+  - Global defaults toggles (premiere, new episodes, finale, binge ready)
+  - Show management list (only in-production shows)
+  - Scheduled alerts with filter (pending/delivered/cancelled)
+
+### Per-Show Notification Settings
+- Tap show from hub → Edit screen with:
+  - Stretchy poster header
+  - Individual toggles (override global defaults)
+  - Finale reminder timing (day of, 1 day, 2 days, 1 week)
+  - Quiet hours configuration
+  - Scheduled alerts list for that show
+  - Reset to global defaults button
+  - Cancel all notifications button
+- Only shows still in production get notification options
+
 ---
 
 ## What this app is NOT
