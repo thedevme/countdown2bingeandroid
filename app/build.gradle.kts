@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -81,6 +82,19 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.database.ktx)
+
+    // Gson (for Firebase JSON parsing)
+    implementation(libs.gson)
+
+    // YouTube Player
+    implementation(libs.youtube.player)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

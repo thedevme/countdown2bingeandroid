@@ -25,7 +25,10 @@ class TMDBService @Inject constructor() {
         private const val TIMEOUT_SECONDS = 30L
         const val IMAGE_BASE_URL = "https://image.tmdb.org/t/p/"
         const val POSTER_SIZE = "w500"
+        const val POSTER_SIZE_SMALL = "w342"
         const val BACKDROP_SIZE = "w780"
+        const val LOGO_SIZE = "w300"
+        const val PROFILE_SIZE = "w185"
     }
 
     private val moshi: Moshi = Moshi.Builder()
@@ -96,6 +99,59 @@ class TMDBService @Inject constructor() {
     }
 
     /**
+     * Get currently airing TV shows.
+     */
+    suspend fun getOnTheAir(page: Int = 1): Result<TMDBSearchResponse> {
+        return executeRequest { api.getOnTheAir(page) }
+    }
+
+    /**
+     * Get images for a TV show.
+     */
+    suspend fun getShowImages(showId: Int): Result<TMDBImagesResponse> {
+        return executeRequest { api.getShowImages(showId) }
+    }
+
+    /**
+     * Get TV shows by genre.
+     */
+    suspend fun getShowsByGenre(genreIds: List<Int>, page: Int = 1): Result<TMDBSearchResponse> {
+        val genreString = genreIds.joinToString(",")
+        return executeRequest { api.discover(withGenres = genreString, page = page) }
+    }
+
+    /**
+     * Get English logo path for a show.
+     * Returns the first English logo, or null if not found.
+     */
+    suspend fun getEnglishLogoPath(showId: Int): String? {
+        return getShowImages(showId).getOrNull()?.logos
+            ?.firstOrNull { it.languageCode == "en" }
+            ?.filePath
+    }
+
+    /**
+     * Get videos (trailers, teasers, clips) for a TV show.
+     */
+    suspend fun getShowVideos(showId: Int): Result<TMDBVideosResponse> {
+        return executeRequest { api.getShowVideos(showId) }
+    }
+
+    /**
+     * Get credits (cast and crew) for a TV show.
+     */
+    suspend fun getShowCredits(showId: Int): Result<TMDBCreditsResponse> {
+        return executeRequest { api.getShowCredits(showId) }
+    }
+
+    /**
+     * Get recommended TV shows based on a specific show.
+     */
+    suspend fun getShowRecommendations(showId: Int, page: Int = 1): Result<TMDBSearchResponse> {
+        return executeRequest { api.getShowRecommendations(showId, page) }
+    }
+
+    /**
      * Build full image URL from path.
      */
     fun buildImageUrl(path: String?, size: String = POSTER_SIZE): String? {
@@ -114,6 +170,13 @@ class TMDBService @Inject constructor() {
      */
     fun buildBackdropUrl(path: String?): String? {
         return buildImageUrl(path, BACKDROP_SIZE)
+    }
+
+    /**
+     * Build full logo URL.
+     */
+    fun buildLogoUrl(path: String?): String? {
+        return buildImageUrl(path, LOGO_SIZE)
     }
 
     /**

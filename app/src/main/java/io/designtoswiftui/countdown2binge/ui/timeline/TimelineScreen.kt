@@ -26,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.designtoswiftui.countdown2binge.models.CountdownDisplayMode
 import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
 import io.designtoswiftui.countdown2binge.ui.theme.Background
@@ -45,6 +46,7 @@ import io.designtoswiftui.countdown2binge.ui.timeline.components.TimelineHeader
 import io.designtoswiftui.countdown2binge.ui.timeline.components.TimelineHeaderType
 import io.designtoswiftui.countdown2binge.ui.timeline.components.TimelineSection
 import io.designtoswiftui.countdown2binge.ui.timeline.components.TimelineSectionStyle
+import io.designtoswiftui.countdown2binge.viewmodels.SettingsViewModel
 import io.designtoswiftui.countdown2binge.viewmodels.TimelineShow
 import io.designtoswiftui.countdown2binge.viewmodels.TimelineViewModel
 import java.time.LocalDateTime
@@ -60,6 +62,7 @@ import androidx.compose.runtime.setValue
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
     onShowClick: (Long) -> Unit = {},
     onViewFullTimelineClick: () -> Unit = {}
 ) {
@@ -69,6 +72,7 @@ fun TimelineScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isEmpty by viewModel.isEmpty.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val countdownDisplayMode by settingsViewModel.countdownDisplayMode.collectAsState()
 
     // Determine hero show (show with soonest date)
     val heroShow by remember(airingShows, premieringShows) {
@@ -137,6 +141,7 @@ fun TimelineScreen(
                         anticipatedShows = anticipatedShows,
                         heroDays = heroDays,
                         isHeroFinale = isHeroFinale,
+                        countdownDisplayMode = countdownDisplayMode,
                         onShowClick = onShowClick,
                         onViewFullTimelineClick = onViewFullTimelineClick
                     )
@@ -153,6 +158,7 @@ private fun TimelineContent(
     anticipatedShows: List<TimelineShow>,
     heroDays: Int?,
     isHeroFinale: Boolean,
+    countdownDisplayMode: CountdownDisplayMode,
     onShowClick: (Long) -> Unit,
     onViewFullTimelineClick: () -> Unit
 ) {
@@ -169,6 +175,10 @@ private fun TimelineContent(
 
     val selectedDays = remember(selectedShow) {
         selectedShow?.daysUntilFinale ?: selectedShow?.daysUntilPremiere
+    }
+
+    val selectedEpisodes = remember(selectedShow) {
+        selectedShow?.episodesRemaining
     }
 
     val selectedIsFinale = remember(selectedShow) {
@@ -256,10 +266,15 @@ private fun TimelineContent(
                 )
             }
 
-            // Slot Machine Days Picker - updates based on selected card
+            // Slot Machine Countdown - updates based on selected card and display mode
             item {
+                val countdownValue = when (countdownDisplayMode) {
+                    CountdownDisplayMode.DAYS -> selectedDays ?: heroDays
+                    CountdownDisplayMode.EPISODES -> selectedEpisodes
+                }
                 SlotMachineDaysPicker(
-                    days = selectedDays ?: heroDays
+                    value = countdownValue,
+                    mode = countdownDisplayMode
                 )
             }
 

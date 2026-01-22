@@ -1,0 +1,39 @@
+default_platform(:android)
+
+platform :android do
+
+  desc "Build and distribute to Firebase App Distribution for testing"
+  lane :beta do
+    # Build the debug APK
+    gradle(
+      task: "assemble",
+      build_type: "Debug"
+    )
+
+    # Upload to Firebase App Distribution
+    firebase_app_distribution(
+      app: "1:924077090262:android:b255af52c9d1edacb7b077",
+      firebase_cli_token: ENV["FIREBASE_TOKEN"],
+      groups: "testers",
+      release_notes: "Beta build - #{Time.now.strftime('%Y-%m-%d %H:%M')}"
+    )
+  end
+
+  desc "Build and distribute release build to Firebase"
+  lane :beta_release do
+    # Build the release APK
+    gradle(
+      task: "assemble",
+      build_type: "Release"
+    )
+
+    # Upload to Firebase App Distribution
+    firebase_app_distribution(
+      app: "1:924077090262:android:b255af52c9d1edacb7b077",
+      firebase_cli_token: ENV["FIREBASE_TOKEN"],
+      groups: "testers",
+      release_notes: "Release build - #{Time.now.strftime('%Y-%m-%d %H:%M')}"
+    )
+  end
+
+end

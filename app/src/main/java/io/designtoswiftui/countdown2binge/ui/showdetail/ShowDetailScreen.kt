@@ -1,117 +1,112 @@
 package io.designtoswiftui.countdown2binge.ui.showdetail
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import io.designtoswiftui.countdown2binge.models.SeasonState
-import io.designtoswiftui.countdown2binge.models.Show
-import io.designtoswiftui.countdown2binge.models.ShowStatus
-import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
-import io.designtoswiftui.countdown2binge.ui.components.CountdownSize
-import io.designtoswiftui.countdown2binge.ui.components.DaysCountdown
-import io.designtoswiftui.countdown2binge.ui.components.EpisodesCountdown
-import io.designtoswiftui.countdown2binge.ui.components.StateBadge
-import io.designtoswiftui.countdown2binge.ui.components.backgroundColor
+import io.designtoswiftui.countdown2binge.models.GenreMapping
+import io.designtoswiftui.countdown2binge.ui.detail.components.BackdropHeader
+import io.designtoswiftui.countdown2binge.ui.detail.components.CastSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.EpisodeSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.FollowActionButton
+import io.designtoswiftui.countdown2binge.ui.detail.components.GenreTagsSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.InfoSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.MoreLikeThisSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.SeasonPicker
+import io.designtoswiftui.countdown2binge.ui.detail.components.SpinoffSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.TechnicalSpecsSection
+import io.designtoswiftui.countdown2binge.ui.detail.components.TrailersSection
 import io.designtoswiftui.countdown2binge.ui.theme.Background
-import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
-import io.designtoswiftui.countdown2binge.ui.theme.GradientOverlayEnd
-import io.designtoswiftui.countdown2binge.ui.theme.GradientOverlayStart
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
-import io.designtoswiftui.countdown2binge.ui.theme.Destructive
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundMuted
-import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
 import io.designtoswiftui.countdown2binge.ui.theme.Primary
-import io.designtoswiftui.countdown2binge.ui.theme.StateWatched
-import io.designtoswiftui.countdown2binge.ui.theme.Surface
-import io.designtoswiftui.countdown2binge.ui.theme.SurfaceVariant
-import io.designtoswiftui.countdown2binge.viewmodels.SeasonDetail
 import io.designtoswiftui.countdown2binge.viewmodels.ShowDetailViewModel
 
 /**
- * Show Detail screen displaying a show with its seasons.
+ * Show Detail screen displaying comprehensive show information.
+ * Works for both followed and non-followed shows - always fetches from TMDB.
+ *
+ * Layout (vertical scroll):
+ * 1. BackdropHeader (420dp hero with logo/title)
+ * 2. InfoSection (expandable synopsis + metadata)
+ * 3. GenreTagsSection (max 3 tags)
+ * 4. FollowActionButton (48dp full-width)
+ * 5. SeasonPicker (if multiple seasons)
+ * 6. EpisodeSection (episode list with watermark)
+ * 7. TrailersSection (horizontal video scroll)
+ * 8. CastSection (horizontal cast scroll)
+ * 9. MoreLikeThisSection (2-column recommendations)
+ * 10. SpinoffSection (premium-gated franchise shows)
+ * 11. TechnicalSpecsSection (badges + info rows)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShowDetailScreen(
     showId: Long,
     viewModel: ShowDetailViewModel = hiltViewModel(),
     onBackClick: () -> Unit = {},
-    onSeasonClick: (Long) -> Unit = {}
+    onSeasonClick: (Long) -> Unit = {},
+    onShowClick: (Int) -> Unit = {},
+    onVideoClick: (String, String) -> Unit = { _, _ -> }
 ) {
-    val show by viewModel.show.collectAsState()
-    val seasons by viewModel.seasons.collectAsState()
+    val showDetails by viewModel.showDetails.collectAsState()
+    val seasonDetails by viewModel.seasonDetails.collectAsState()
+    val selectedSeasonNumber by viewModel.selectedSeasonNumber.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isFollowed by viewModel.isFollowed.collectAsState()
+    val isAdding by viewModel.isAdding.collectAsState()
     val error by viewModel.error.collectAsState()
+    val logoPath by viewModel.logoPath.collectAsState()
+    val isSynopsisExpanded by viewModel.isSynopsisExpanded.collectAsState()
+    val isEpisodeListExpanded by viewModel.isEpisodeListExpanded.collectAsState()
 
-    // Load show if not already loaded via SavedStateHandle
-    LaunchedEffect(showId) {
-        if (showId > 0 && show == null) {
-            viewModel.loadShowById(showId)
-        }
-    }
+    // Additional content
+    val videos by viewModel.videos.collectAsState()
+    val cast by viewModel.cast.collectAsState()
+    val crew by viewModel.crew.collectAsState()
+    val recommendations by viewModel.recommendations.collectAsState()
 
-    // Refresh data when screen resumes (e.g., returning from episode list)
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refresh()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
+    // Spinoffs
+    val hasFranchise by viewModel.hasFranchise.collectAsState()
+    val spinoffShows by viewModel.spinoffShows.collectAsState()
+    val isLoadingSpinoffs by viewModel.isLoadingSpinoffs.collectAsState()
+
+    // For opening YouTube links
+    val context = LocalContext.current
+
+    // Track followed shows for recommendations (simplified - just use isFollowed for current show)
+    var followedShowsSet by remember { mutableStateOf(setOf<Int>()) }
+    var addingShowsSet by remember { mutableStateOf(setOf<Int>()) }
+
+    // Premium state (placeholder - will be connected to settings later)
+    val isPremium = true // TODO: Connect to actual premium state
 
     Box(
         modifier = Modifier
@@ -123,411 +118,202 @@ fun ShowDetailScreen(
                 LoadingState()
             }
             error != null -> {
-                ErrorState(message = error!!, onBackClick = onBackClick)
-            }
-            show != null -> {
-                ShowDetailContent(
-                    show = show!!,
-                    seasons = seasons,
-                    isRefreshing = isRefreshing,
-                    onBackClick = onBackClick,
-                    onSeasonClick = onSeasonClick,
-                    onMarkWatched = viewModel::markSeasonWatched,
-                    onUnmarkWatched = viewModel::unmarkSeasonWatched,
-                    onUnfollowShow = { viewModel.unfollowShow(onBackClick) },
-                    onRefresh = viewModel::refreshFromNetwork
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ShowDetailContent(
-    show: Show,
-    seasons: List<SeasonDetail>,
-    isRefreshing: Boolean,
-    onBackClick: () -> Unit,
-    onSeasonClick: (Long) -> Unit,
-    onMarkWatched: (Long) -> Unit,
-    onUnmarkWatched: (Long) -> Unit,
-    onUnfollowShow: () -> Unit,
-    onRefresh: () -> Unit
-) {
-    // State for confirmation dialogs
-    var showWatchedDialog by remember { mutableStateOf(false) }
-    var selectedSeasonForDialog by remember { mutableStateOf<SeasonDetail?>(null) }
-    var showUnfollowDialog by remember { mutableStateOf(false) }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize()
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Hero backdrop header
-            item {
-                HeroHeader(
-                    show = show,
+                ErrorState(
+                    message = error!!,
                     onBackClick = onBackClick
                 )
             }
+            showDetails != null -> {
+                val details = showDetails!!
+                val genres = details.genres?.mapNotNull { it.name } ?: emptyList()
+                val genreIds = details.genres?.map { it.id } ?: emptyList()
+                val genreNames = GenreMapping.getGenreNames(genreIds, 3)
+                val currentSeasonEpisodes = seasonDetails[selectedSeasonNumber]?.episodes ?: emptyList()
+                val createdBy = crew.filter { it.job == "Creator" }.map { it.name }
+                val networkName = details.networks?.firstOrNull()?.name
 
-            // Show info section
-            item {
-                ShowInfoSection(
-                    show = show,
-                    onUnfollowClick = { showUnfollowDialog = true }
-                )
-            }
-
-            // Seasons header
-            if (seasons.isNotEmpty()) {
-                item {
-                    SeasonsHeader(count = seasons.size)
-                }
-            }
-
-            // Season cards
-            items(
-                items = seasons,
-                key = { it.season.id }
-            ) { seasonDetail ->
-                SeasonCard(
-                    seasonDetail = seasonDetail,
-                    onClick = { onSeasonClick(seasonDetail.season.id) },
-                    onWatchedClick = {
-                        selectedSeasonForDialog = seasonDetail
-                        showWatchedDialog = true
-                    }
-                )
-            }
-
-            // Bottom spacing
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
-    }
-
-    // Confirmation dialog
-    if (showWatchedDialog && selectedSeasonForDialog != null) {
-        val season = selectedSeasonForDialog!!.season
-        val isWatched = season.state == SeasonState.WATCHED
-
-        MarkWatchedDialog(
-            seasonNumber = season.seasonNumber,
-            showTitle = show.title,
-            isWatched = isWatched,
-            onConfirm = {
-                if (isWatched) {
-                    onUnmarkWatched(season.id)
-                } else {
-                    onMarkWatched(season.id)
-                }
-                showWatchedDialog = false
-                selectedSeasonForDialog = null
-            },
-            onDismiss = {
-                showWatchedDialog = false
-                selectedSeasonForDialog = null
-            }
-        )
-    }
-
-    // Unfollow confirmation dialog
-    if (showUnfollowDialog) {
-        UnfollowShowDialog(
-            showTitle = show.title,
-            onConfirm = {
-                showUnfollowDialog = false
-                onUnfollowShow()
-            },
-            onDismiss = { showUnfollowDialog = false }
-        )
-    }
-}
-
-@Composable
-private fun HeroHeader(
-    show: Show,
-    onBackClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-    ) {
-        // Backdrop image
-        AsyncImage(
-            model = show.backdropPath?.let {
-                "${TMDBService.IMAGE_BASE_URL}${TMDBService.BACKDROP_SIZE}$it"
-            },
-            contentDescription = show.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        // Gradient overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            GradientOverlayStart,
-                            GradientOverlayEnd
-                        ),
-                        startY = 0f,
-                        endY = Float.POSITIVE_INFINITY
-                    )
-                )
-        )
-
-        // Back button
-        IconButton(
-            onClick = onBackClick,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = OnBackground
-            )
-        }
-
-        // Title overlay at bottom
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(16.dp)
-        ) {
-            Text(
-                text = show.title,
-                color = OnBackground,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Status badge
-            ShowStatusBadge(status = show.status)
-        }
-    }
-}
-
-@Composable
-private fun ShowStatusBadge(status: ShowStatus) {
-    val (text, color) = when (status) {
-        ShowStatus.RETURNING -> "Returning Series" to Primary
-        ShowStatus.ENDED -> "Ended" to OnBackgroundMuted
-        ShowStatus.CANCELED -> "Canceled" to OnBackgroundMuted
-        ShowStatus.IN_PRODUCTION -> "In Production" to Primary
-        ShowStatus.PLANNED -> "Planned" to OnBackgroundSubtle
-        ShowStatus.UNKNOWN -> "Unknown" to OnBackgroundSubtle
-    }
-
-    Box(
-        modifier = Modifier
-            .background(
-                color = color.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun ShowInfoSection(
-    show: Show,
-    onUnfollowClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        // Overview
-        show.overview?.let { overview ->
-            if (overview.isNotEmpty()) {
-                Text(
-                    text = overview,
-                    color = OnBackgroundMuted,
-                    fontSize = 14.sp,
-                    lineHeight = 22.sp
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Unfollow button
-        TextButton(
-            onClick = onUnfollowClick,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "Unfollow Show",
-                color = Destructive,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-private fun SeasonsHeader(count: Int) {
-    Text(
-        text = "Seasons ($count)",
-        color = OnBackground,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-    )
-}
-
-@Composable
-private fun SeasonCard(
-    seasonDetail: SeasonDetail,
-    onClick: () -> Unit,
-    onWatchedClick: () -> Unit
-) {
-    val season = seasonDetail.season
-    val isWatched = season.state == SeasonState.WATCHED
-    val isFullyWatched = seasonDetail.isFullyWatched
-    val canMarkWatched = season.state == SeasonState.BINGE_READY ||
-                         season.state == SeasonState.WATCHED ||
-                         season.state == SeasonState.AIRING
-
-    // Determine button text based on episode watched status
-    val showUnmarkButton = isWatched || isFullyWatched
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        ),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left side: Season info
-                Column(
-                    modifier = Modifier.weight(1f)
+                // PullToRefreshBox with LazyColumn
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Text(
-                            text = "Season ${season.seasonNumber}",
-                            color = OnBackground,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        // 1. BackdropHeader (420dp hero with logo/title)
+                        item {
+                            Box {
+                                BackdropHeader(
+                                    backdropPath = details.backdropPath,
+                                    logoPath = logoPath,
+                                    title = details.name,
+                                    onShareClick = {
+                                        val shareText = "Check out ${details.name} on Countdown2Binge!\nhttps://www.themoviedb.org/tv/${details.id}"
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share show"))
+                                    }
+                                )
 
-                        StateBadge(
-                            state = season.state,
-                            showDot = true
-                        )
+                                // Back button overlay
+                                IconButton(
+                                    onClick = onBackClick,
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = OnBackground
+                                    )
+                                }
+                            }
+                        }
+
+                        // Spacing after header
+                        item { Spacer(modifier = Modifier.height(20.dp)) }
+
+                        // 2. InfoSection (synopsis + metadata)
+                        item {
+                            InfoSection(
+                                synopsis = details.overview,
+                                seasonCount = viewModel.seasonCount,
+                                statusText = viewModel.statusText,
+                                isExpanded = isSynopsisExpanded,
+                                onExpandClick = viewModel::toggleSynopsisExpanded
+                            )
+                        }
+
+                        // Spacing
+                        item { Spacer(modifier = Modifier.height(16.dp)) }
+
+                        // 3. GenreTagsSection
+                        if (genreNames.isNotEmpty()) {
+                            item {
+                                GenreTagsSection(genres = genreNames)
+                            }
+                            item { Spacer(modifier = Modifier.height(16.dp)) }
+                        }
+
+                        // 4. FollowActionButton
+                        item {
+                            FollowActionButton(
+                                isFollowed = isFollowed,
+                                isLoading = isAdding,
+                                onClick = viewModel::toggleFollow
+                            )
+                        }
+
+                        // Spacing
+                        item { Spacer(modifier = Modifier.height(20.dp)) }
+
+                        // 5. SeasonPicker (if multiple seasons)
+                        if (viewModel.hasMultipleSeasons) {
+                            item {
+                                SeasonPicker(
+                                    seasons = viewModel.regularSeasons,
+                                    selectedSeason = selectedSeasonNumber,
+                                    onSeasonSelected = viewModel::selectSeason
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(16.dp)) }
+                        }
+
+                        // 6. EpisodeSection
+                        if (currentSeasonEpisodes.isNotEmpty()) {
+                            item {
+                                EpisodeSection(
+                                    seasonNumber = selectedSeasonNumber,
+                                    episodes = currentSeasonEpisodes,
+                                    isExpanded = isEpisodeListExpanded,
+                                    onExpandClick = viewModel::toggleEpisodeListExpanded
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
+                        }
+
+                        // 7. TrailersSection
+                        if (videos.isNotEmpty()) {
+                            item {
+                                TrailersSection(
+                                    videos = videos,
+                                    onVideoClick = { video ->
+                                        // Navigate to in-app YouTube player
+                                        onVideoClick(video.key, video.name)
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
+                        }
+
+                        // 8. CastSection
+                        if (cast.isNotEmpty()) {
+                            item {
+                                CastSection(cast = cast)
+                            }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
+                        }
+
+                        // 9. MoreLikeThisSection
+                        if (recommendations.isNotEmpty()) {
+                            item {
+                                MoreLikeThisSection(
+                                    recommendations = recommendations,
+                                    followedShows = followedShowsSet,
+                                    addingShows = addingShowsSet,
+                                    onShowClick = onShowClick,
+                                    onFollowClick = { tmdbId ->
+                                        // TODO: Implement follow for recommendations
+                                    }
+                                )
+                            }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
+                        }
+
+                        // 10. SpinoffSection (premium-gated)
+                        if (hasFranchise) {
+                            item {
+                                SpinoffSection(
+                                    spinoffs = spinoffShows,
+                                    followedShows = followedShowsSet,
+                                    addingShows = addingShowsSet,
+                                    isPremium = isPremium,
+                                    isLoading = isLoadingSpinoffs,
+                                    onShowClick = onShowClick,
+                                    onFollowClick = { tmdbId ->
+                                        // TODO: Implement follow for spinoffs
+                                    },
+                                    onUnlock = {
+                                        // TODO: Open paywall
+                                    }
+                                )
+
+                                // Load spinoff details when section is visible
+                                if (isPremium && spinoffShows.isEmpty() && !isLoadingSpinoffs) {
+                                    viewModel.loadSpinoffDetails()
+                                }
+                            }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
+                        }
+
+                        // 11. TechnicalSpecsSection
+                        item {
+                            TechnicalSpecsSection(
+                                createdBy = createdBy,
+                                genres = genres,
+                                network = networkName
+                            )
+                        }
+
+                        // Bottom padding
+                        item { Spacer(modifier = Modifier.height(40.dp)) }
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Show watched/total episodes
-                    Text(
-                        text = "${seasonDetail.watchedCount} / ${seasonDetail.totalEpisodes} episodes",
-                        color = if (isFullyWatched) Primary else OnBackgroundSubtle,
-                        fontSize = 13.sp
-                    )
-                }
-
-                // Right side: Countdown or watched indicator
-                SeasonCountdown(seasonDetail = seasonDetail)
-            }
-
-            // Mark as Watched button
-            if (canMarkWatched) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                TextButton(
-                    onClick = onWatchedClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (showUnmarkButton) "Unmark as Watched" else "Mark as Watched",
-                        color = if (showUnmarkButton) StateWatched else Primary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SeasonCountdown(seasonDetail: SeasonDetail) {
-    val season = seasonDetail.season
-    val accentColor = season.state.backgroundColor
-
-    when (season.state) {
-        SeasonState.PREMIERING -> {
-            seasonDetail.daysUntilPremiere?.let { days ->
-                DaysCountdown(
-                    days = days,
-                    size = CountdownSize.Small,
-                    accentColor = accentColor
-                )
-            }
-        }
-        SeasonState.AIRING -> {
-            seasonDetail.daysUntilFinale?.let { days ->
-                DaysCountdown(
-                    days = days,
-                    size = CountdownSize.Small,
-                    accentColor = accentColor
-                )
-            } ?: seasonDetail.episodesRemaining?.let { episodes ->
-                EpisodesCountdown(
-                    episodes = episodes,
-                    size = CountdownSize.Small,
-                    accentColor = accentColor
-                )
-            }
-        }
-        else -> {
-            // No countdown for other states
         }
     }
 }
@@ -550,134 +336,40 @@ private fun ErrorState(
     message: String,
     onBackClick: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp)
     ) {
-        Text(
-            text = "Something went wrong",
-            color = OnBackgroundMuted,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = message,
-            color = OnBackgroundSubtle,
-            fontSize = 14.sp
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        IconButton(onClick = onBackClick) {
+        // Back button
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Go back",
+                contentDescription = "Back",
                 tint = OnBackground
             )
         }
-    }
-}
 
-@Composable
-private fun MarkWatchedDialog(
-    seasonNumber: Int,
-    showTitle: String,
-    isWatched: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceVariant,
-        titleContentColor = OnBackground,
-        textContentColor = OnBackgroundMuted,
-        title = {
+        // Error message
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text(
-                text = if (isWatched) "Unmark as Watched?" else "Mark as Watched?",
-                fontWeight = FontWeight.SemiBold
+                text = "Something went wrong",
+                color = OnBackground,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium
             )
-        },
-        text = {
             Text(
-                text = if (isWatched) {
-                    "Remove Season $seasonNumber of $showTitle from your watched list?"
-                } else {
-                    "Mark Season $seasonNumber of $showTitle as watched?"
-                }
+                text = message,
+                color = OnBackgroundMuted,
+                fontSize = 14.sp
             )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = if (isWatched) "Unmark" else "Mark Watched",
-                    color = Primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "Cancel",
-                    color = OnBackgroundMuted
-                )
-            }
         }
-    )
-}
-
-@Composable
-private fun UnfollowShowDialog(
-    showTitle: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceVariant,
-        titleContentColor = OnBackground,
-        textContentColor = OnBackgroundMuted,
-        title = {
-            Text(
-                text = "Unfollow Show?",
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
-            Text(
-                text = "Remove \"$showTitle\" from your followed shows? This will also remove all watched progress."
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = "Unfollow",
-                    color = Destructive,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "Cancel",
-                    color = OnBackgroundMuted
-                )
-            }
-        }
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ShowDetailScreenPreview() {
-    Countdown2BingeTheme {
-        // Preview with mock data would go here
     }
 }

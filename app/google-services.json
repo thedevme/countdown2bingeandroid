@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "924077090262",
+    "firebase_url": "https://countdown2binge-default-rtdb.firebaseio.com",
+    "project_id": "countdown2binge",
+    "storage_bucket": "countdown2binge.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:924077090262:android:b255af52c9d1edacb7b077",
+        "android_client_info": {
+          "package_name": "io.designtoswiftui.countdown2binge"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNbZPtNnJH4dKx8j35XV-PuEhyswPBPlo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,12 +3,17 @@ package io.designtoswiftui.countdown2binge.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.designtoswiftui.countdown2binge.models.AiringShowDisplay
+import io.designtoswiftui.countdown2binge.models.GenreMapping
 import io.designtoswiftui.countdown2binge.models.Show
+import io.designtoswiftui.countdown2binge.models.TrendingShowDisplay
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBSearchResult
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
 import io.designtoswiftui.countdown2binge.usecases.AddShowUseCase
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +22,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 /**
@@ -62,8 +70,39 @@ class SearchViewModel @Inject constructor(
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
 
+    // Trending shows with logos
+    private val _trendingShows = MutableStateFlow<List<TrendingShowDisplay>>(emptyList())
+    val trendingShows: StateFlow<List<TrendingShowDisplay>> = _trendingShows.asStateFlow()
+
+    // Airing/ending soon shows with days left
+    private val _airingShows = MutableStateFlow<List<AiringShowDisplay>>(emptyList())
+    val airingShows: StateFlow<List<AiringShowDisplay>> = _airingShows.asStateFlow()
+
+    // Loading states for landing sections
+    private val _isTrendingLoading = MutableStateFlow(false)
+    val isTrendingLoading: StateFlow<Boolean> = _isTrendingLoading.asStateFlow()
+
+    private val _isAiringLoading = MutableStateFlow(false)
+    val isAiringLoading: StateFlow<Boolean> = _isAiringLoading.asStateFlow()
+
+    // Pagination state for future "See All" screens
+    private var airingShowsPage: Int = 1
+    private var airingShowsTotalPages: Int = 1
+
     init {
         setupSearchDebounce()
+        loadLandingContent()
+    }
+
+    /**
+     * Load trending and airing shows for the landing state.
+     */
+    private fun loadLandingContent() {
+        viewModelScope.launch {
+            // Load both concurrently
+            launch { loadTrendingShows() }
+            launch { loadAiringShows() }
+        }
     }
 
     @OptIn(FlowPreview::class)
@@ -231,5 +270,163 @@ class SearchViewModel @Inject constructor(
         _searchQuery.value = ""
         _searchResults.value = emptyList()
         _error.value = null
+    }
+
+    /**
+     * Load trending shows with logos.
+     * Fetches first 10 shows and their English logos in parallel.
+     */
+    private suspend fun loadTrendingShows() {
+        _isTrendingLoading.value = true
+
+        val result = tmdbService.getTrending()
+
+        result.fold(
+            onSuccess = { response ->
+                val shows = response.results.take(10)
+
+                // Fetch logos in parallel for all shows
+                val showsWithLogos = shows.map { show ->
+                    viewModelScope.async {
+                        val logoPath = tmdbService.getEnglishLogoPath(show.id)
+                        val genreNames = GenreMapping.getGenreNames(show.genreIds ?: emptyList())
+                        TrendingShowDisplay(
+                            show = show,
+                            logoPath = logoPath,
+                            genreNames = genreNames,
+                            seasonNumber = 1 // Default to S1, could fetch if needed
+                        )
+                    }
+                }.awaitAll()
+
+                _trendingShows.value = showsWithLogos
+
+                // Check followed status for trending shows
+                checkFollowedStatus(shows.map { it.id })
+            },
+            onFailure = {
+                // Silently fail, landing will show empty state
+            }
+        )
+
+        _isTrendingLoading.value = false
+    }
+
+    /**
+     * Load airing/ending soon shows with days-left calculation.
+     * Fetches first ~10 shows, calculates days left for first 3.
+     */
+    private suspend fun loadAiringShows() {
+        _isAiringLoading.value = true
+
+        val result = tmdbService.getOnTheAir()
+
+        result.fold(
+            onSuccess = { response ->
+                airingShowsTotalPages = response.totalPages
+                val shows = response.results.take(10)
+
+                // Calculate days left for first 3 shows only (API intensive)
+                val showsWithDays = shows.mapIndexed { index, show ->
+                    viewModelScope.async {
+                        val daysLeft = if (index < 3) {
+                            calculateDaysLeft(show.id)
+                        } else {
+                            null
+                        }
+                        val genreNames = GenreMapping.getGenreNames(show.genreIds ?: emptyList())
+                        AiringShowDisplay(
+                            show = show,
+                            daysLeft = daysLeft,
+                            genreNames = genreNames
+                        )
+                    }
+                }.awaitAll()
+
+                _airingShows.value = showsWithDays
+
+                // Check followed status for airing shows
+                checkFollowedStatus(shows.map { it.id })
+            },
+            onFailure = {
+                // Silently fail
+            }
+        )
+
+        _isAiringLoading.value = false
+    }
+
+    /**
+     * Calculate days until the season finale for a show.
+     * Returns null if unable to determine.
+     */
+    private suspend fun calculateDaysLeft(showId: Int): Int? {
+        return try {
+            val detailsResult = tmdbService.getShowDetails(showId)
+            detailsResult.getOrNull()?.let { details ->
+                // Find the current airing season
+                val currentSeason = details.seasons
+                    ?.filter { it.seasonNumber > 0 } // Exclude specials
+                    ?.maxByOrNull { it.seasonNumber }
+
+                currentSeason?.let { season ->
+                    // Get full season details to find finale date
+                    val seasonResult = tmdbService.getSeasonDetails(showId, season.seasonNumber)
+                    seasonResult.getOrNull()?.episodes?.lastOrNull()?.airDate?.let { finaleDate ->
+                        parseDateAndCalculateDays(finaleDate)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Parse a date string and calculate days from today.
+     */
+    private fun parseDateAndCalculateDays(dateString: String): Int? {
+        return try {
+            val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+            val finaleDate = LocalDate.parse(dateString, formatter)
+            val today = LocalDate.now()
+            val days = ChronoUnit.DAYS.between(today, finaleDate).toInt()
+            if (days >= 0) days else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Remove a show from followed list.
+     */
+    fun removeShow(tmdbId: Int) {
+        viewModelScope.launch {
+            val show = repository.getShow(tmdbId)
+            if (show != null) {
+                repository.delete(show)
+                _followedShows.update { it - tmdbId }
+                _showIdMap.update { it - tmdbId }
+                _snackbarMessage.value = "${show.title} removed from your shows"
+            }
+        }
+    }
+
+    /**
+     * Toggle follow status for a show.
+     */
+    fun toggleFollow(tmdbId: Int) {
+        if (isFollowed(tmdbId)) {
+            removeShow(tmdbId)
+        } else {
+            addShowAsync(tmdbId)
+        }
+    }
+
+    /**
+     * Refresh landing content.
+     */
+    fun refreshLandingContent() {
+        loadLandingContent()
     }
 }

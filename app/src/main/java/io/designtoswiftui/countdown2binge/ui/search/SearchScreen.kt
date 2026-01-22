@@ -27,7 +27,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -49,16 +48,22 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import io.designtoswiftui.countdown2binge.models.AiringShowDisplay
+import io.designtoswiftui.countdown2binge.models.ShowCategory
+import io.designtoswiftui.countdown2binge.models.TrendingShowDisplay
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBSearchResult
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
 import io.designtoswiftui.countdown2binge.ui.components.AddButton
+import io.designtoswiftui.countdown2binge.ui.shared.PortraitShowCard
+import io.designtoswiftui.countdown2binge.ui.search.components.AiringShowCard
+import io.designtoswiftui.countdown2binge.ui.search.components.CategoryChips
+import io.designtoswiftui.countdown2binge.ui.search.components.SectionHeader
+import io.designtoswiftui.countdown2binge.ui.search.components.TrendingShowCard
 import io.designtoswiftui.countdown2binge.ui.theme.Background
-import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundMuted
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
@@ -69,11 +74,13 @@ import io.designtoswiftui.countdown2binge.viewmodels.SearchViewModel
 
 /**
  * Search screen for finding and adding TV shows.
+ * Shows landing content (trending, airing) when search is empty.
  */
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
-    onShowClick: (Long) -> Unit = {}
+    onShowClick: (Int) -> Unit = {},  // Now uses tmdbId for navigation
+    onCategoryClick: (ShowCategory) -> Unit = {}
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
@@ -83,6 +90,12 @@ fun SearchScreen(
     val addingShows by viewModel.addingShows.collectAsState()
     val snackbarMessage by viewModel.snackbarMessage.collectAsState()
     val showIdMap by viewModel.showIdMap.collectAsState()
+
+    // Landing content states
+    val trendingShows by viewModel.trendingShows.collectAsState()
+    val airingShows by viewModel.airingShows.collectAsState()
+    val isTrendingLoading by viewModel.isTrendingLoading.collectAsState()
+    val isAiringLoading by viewModel.isAiringLoading.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
@@ -141,8 +154,19 @@ fun SearchScreen(
                         ErrorState(message = error!!)
                     }
                     searchQuery.isEmpty() -> {
-                        // Empty query state
-                        EmptyQueryState()
+                        // Landing state with trending and airing shows
+                        LandingContent(
+                            trendingShows = trendingShows,
+                            airingShows = airingShows,
+                            isTrendingLoading = isTrendingLoading,
+                            isAiringLoading = isAiringLoading,
+                            followedShows = followedShows,
+                            addingShows = addingShows,
+                            showIdMap = showIdMap,
+                            onCategoryClick = onCategoryClick,
+                            onShowClick = onShowClick,
+                            onFollowClick = viewModel::toggleFollow
+                        )
                     }
                     searchResults.isEmpty() && searchQuery.length >= 2 -> {
                         // No results state
@@ -191,10 +215,11 @@ private fun SearchHeader(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "Search",
+            text = "SEARCH",
             color = OnBackground,
             fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Black,
+            letterSpacing = (-0.5).sp,
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
@@ -204,7 +229,7 @@ private fun SearchHeader(
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
-                    text = "Search for TV shows...",
+                    text = "Search shows to binge",
                     color = OnBackgroundSubtle
                 )
             },
@@ -241,7 +266,7 @@ private fun SearchHeader(
             keyboardActions = KeyboardActions(
                 onSearch = { onSearch() }
             ),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = SurfaceVariant,
                 unfocusedContainerColor = Surface,
@@ -255,133 +280,219 @@ private fun SearchHeader(
     }
 }
 
+/**
+ * Landing content shown when search query is empty.
+ */
+@Composable
+private fun LandingContent(
+    trendingShows: List<TrendingShowDisplay>,
+    airingShows: List<AiringShowDisplay>,
+    isTrendingLoading: Boolean,
+    isAiringLoading: Boolean,
+    followedShows: Set<Int>,
+    addingShows: Set<Int>,
+    showIdMap: Map<Int, Long>,
+    onCategoryClick: (ShowCategory) -> Unit,
+    onShowClick: (Int) -> Unit,  // Now uses tmdbId
+    onFollowClick: (Int) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 16.dp)
+    ) {
+        // Browse by Category
+        item {
+            SectionHeader(
+                title = "Browse by Category",
+                showSeeAll = false,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        item {
+            CategoryChips(
+                onCategoryClick = onCategoryClick
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Trending Shows
+        item {
+            SectionHeader(
+                title = "Trending Shows",
+                showSeeAll = false, // Not implemented yet per spec
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        item {
+            if (isTrendingLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Primary)
+                }
+            } else {
+                TrendingShowsGrid(
+                    shows = trendingShows.take(4),
+                    followedShows = followedShows,
+                    addingShows = addingShows,
+                    showIdMap = showIdMap,
+                    onShowClick = onShowClick,
+                    onFollowClick = onFollowClick
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Ending Soon
+        item {
+            SectionHeader(
+                title = "Ending Soon",
+                showSeeAll = false, // Not implemented yet per spec
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        if (isAiringLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Primary)
+                }
+            }
+        } else {
+            items(
+                items = airingShows.take(3),
+                key = { it.tmdbId }
+            ) { show ->
+                val isFollowed = followedShows.contains(show.tmdbId)
+
+                AiringShowCard(
+                    show = show,
+                    isFollowed = isFollowed,
+                    isLoading = addingShows.contains(show.tmdbId),
+                    onFollowClick = { onFollowClick(show.tmdbId) },
+                    onCardClick = { onShowClick(show.tmdbId) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 2-column grid for trending shows.
+ */
+@Composable
+private fun TrendingShowsGrid(
+    shows: List<TrendingShowDisplay>,
+    followedShows: Set<Int>,
+    addingShows: Set<Int>,
+    showIdMap: Map<Int, Long>,
+    onShowClick: (Int) -> Unit,  // Now uses tmdbId
+    onFollowClick: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // First row
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            shows.take(2).forEach { show ->
+                val isFollowed = followedShows.contains(show.tmdbId)
+
+                TrendingShowCard(
+                    show = show,
+                    isFollowed = isFollowed,
+                    isLoading = addingShows.contains(show.tmdbId),
+                    onFollowClick = { onFollowClick(show.tmdbId) },
+                    onCardClick = { onShowClick(show.tmdbId) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            // Fill empty space if odd number
+            if (shows.size == 1) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+
+        // Second row
+        if (shows.size > 2) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                shows.drop(2).take(2).forEach { show ->
+                    val isFollowed = followedShows.contains(show.tmdbId)
+
+                    TrendingShowCard(
+                        show = show,
+                        isFollowed = isFollowed,
+                        isLoading = addingShows.contains(show.tmdbId),
+                        onFollowClick = { onFollowClick(show.tmdbId) },
+                        onCardClick = { onShowClick(show.tmdbId) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                // Fill empty space if odd number
+                if (shows.size == 3) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SearchResultsList(
     results: List<TMDBSearchResult>,
     followedShows: Set<Int>,
     addingShows: Set<Int>,
     showIdMap: Map<Int, Long>,
-    onShowClick: (Long) -> Unit,
+    onShowClick: (Int) -> Unit,
     onAddClick: (Int) -> Unit
 ) {
+    // Group results into pairs for 2-column grid
+    val rows = results.chunked(2)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(
-            items = results,
-            key = { it.id }
-        ) { result ->
-            val isFollowed = followedShows.contains(result.id)
-            val localShowId = showIdMap[result.id]
-
-            SearchResultItem(
-                result = result,
-                isFollowed = isFollowed,
-                isAdding = addingShows.contains(result.id),
-                onClick = {
-                    // Only navigate if the show is followed and we have the local ID
-                    if (isFollowed && localShowId != null) {
-                        onShowClick(localShowId)
-                    }
-                },
-                onAddClick = { onAddClick(result.id) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun SearchResultItem(
-    result: TMDBSearchResult,
-    isFollowed: Boolean,
-    isAdding: Boolean,
-    onClick: () -> Unit,
-    onAddClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Poster image
-            AsyncImage(
-                model = result.posterPath?.let {
-                    "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
-                },
-                contentDescription = result.name,
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(90.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceVariant),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Show info
-            Column(
-                modifier = Modifier.weight(1f)
+            items = rows,
+            key = { row -> row.first().id }
+        ) { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = result.name,
-                    color = OnBackground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                row.forEach { result ->
+                    val isFollowed = followedShows.contains(result.id)
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Year from first air date
-                result.firstAirDate?.take(4)?.let { year ->
-                    Text(
-                        text = year,
-                        color = OnBackgroundMuted,
-                        fontSize = 13.sp
+                    PortraitShowCard(
+                        show = result,
+                        isFollowed = isFollowed,
+                        isLoading = addingShows.contains(result.id),
+                        onFollowClick = { onAddClick(result.id) },
+                        onCardClick = { onShowClick(result.id) },
+                        modifier = Modifier.weight(1f)
                     )
                 }
-
-                // Overview snippet
-                result.overview?.let { overview ->
-                    if (overview.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = overview,
-                            color = OnBackgroundSubtle,
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 16.sp
-                        )
-                    }
+                // Fill empty space if odd number of items
+                if (row.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Add button
-            AddButton(
-                isAdded = isFollowed,
-                onClick = onAddClick,
-                isLoading = isAdding
-            )
         }
     }
 }
@@ -396,31 +507,6 @@ private fun LoadingState() {
             color = Primary,
             strokeWidth = 3.dp
         )
-    }
-}
-
-@Composable
-private fun EmptyQueryState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Find your next binge",
-                color = OnBackgroundMuted,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Search for TV shows to start tracking",
-                color = OnBackgroundSubtle,
-                fontSize = 14.sp
-            )
-        }
     }
 }
 
@@ -471,13 +557,5 @@ private fun ErrorState(message: String) {
                 fontSize = 14.sp
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun SearchScreenPreview() {
-    Countdown2BingeTheme {
-        // Preview with mock data would go here
     }
 }

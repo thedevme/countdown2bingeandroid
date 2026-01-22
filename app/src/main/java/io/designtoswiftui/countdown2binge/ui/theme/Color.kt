@@ -36,6 +36,25 @@ val AccentGold = Color(0xFFD4AF37)
 val AccentError = Color(0xFFE57373)
 val Destructive = Color(0xFFCF6679)  // Muted red for destructive actions
 
+// Detail screen accent - Teal (from iOS design spec #4AC7B8)
+val DetailAccent = Color(0xFF4AC7B8)
+
+// Timeline-specific colors
+val TimelineAccent = Color(0xFF4ECDC4)  // Bright teal for timeline elements
+val TimelineAccentMuted = Color(0xFF4ECDC4).copy(alpha = 0.15f)
+val TimelineLine = Color(0xFF4ECDC4).copy(alpha = 0.6f)
+val CardBackground = Color(0xFF1A1A1F)
+val CardBackgroundElevated = Color(0xFF222228)
+val ButtonOutline = Color(0xFF4ECDC4)
+
+// Binge Ready-specific colors (matching iOS)
+val BingeReadyAccent = Color(0xFF2BAFA9)  // Teal accent for binge ready elements
+val BingeReadyBackground = Color(0xFF000000)  // Pure black background
+
+// Timeline section-specific colors (matching iOS)
+val PremieringSoonAccent = Color(0xFF73E6B3)  // Teal-green for premiering soon
+val AnticipatedAccent = Color(0xFF666666)      // Muted gray for anticipated/TBD
+
 // Gradients
 val GradientOverlayStart = Color(0x00000000)
 val GradientOverlayEnd = Color(0xE6000000)

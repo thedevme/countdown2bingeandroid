@@ -13,6 +13,12 @@ class SeasonStateManager @Inject constructor() {
 
     /**
      * Determines the current state of a season based on its dates and watched status.
+     *
+     * Show Lifecycle: Ending → Next State
+     * - Finale - 3 days: AIRING (Ending Soon) "3 DAYS"
+     * - Finale - 1 day:  AIRING (Ending Soon) "1 DAY"
+     * - Finale day:      AIRING (Ending Soon) "0 DAYS" ← stays here until midnight
+     * - Finale + 1 day:  BINGE_READY ← moves here the next day
      */
     fun determineState(season: Season, asOf: LocalDate = LocalDate.now()): SeasonState {
         // If already watched, return watched state
@@ -43,8 +49,15 @@ class SeasonStateManager @Inject constructor() {
             return SeasonState.AIRING
         }
 
-        // Finale has passed - binge ready
-        if (!asOf.isBefore(finaleDate)) {
+        // On finale day - stay AIRING to show "0 DAYS" countdown
+        // This lets users see the countdown hit 0, watch the finale that night,
+        // then wake up the next day to find the show in Binge Ready
+        if (isFinaleDay(season, asOf)) {
+            return SeasonState.AIRING
+        }
+
+        // Day after finale - binge ready
+        if (asOf.isAfter(finaleDate)) {
             return SeasonState.BINGE_READY
         }
 
@@ -75,16 +88,40 @@ class SeasonStateManager @Inject constructor() {
 
     /**
      * Calculates the number of days until the season finale.
-     * Returns null if finale date is not set or has already passed.
+     * Returns null if finale date is not set or has already passed (after finale day).
+     * Returns 0 on finale day itself.
      */
     fun daysUntilFinale(season: Season, asOf: LocalDate = LocalDate.now()): Int? {
         val finaleDate = season.finaleDate ?: return null
 
-        if (!asOf.isBefore(finaleDate)) {
-            return null // Finale has already happened
+        // On finale day, return 0
+        if (asOf.isEqual(finaleDate)) {
+            return 0
+        }
+
+        // Finale has already passed (day after or later)
+        if (asOf.isAfter(finaleDate)) {
+            return null
         }
 
         return ChronoUnit.DAYS.between(asOf, finaleDate).toInt()
+    }
+
+    /**
+     * Checks if today is the finale day for the season.
+     */
+    fun isFinaleDay(season: Season, asOf: LocalDate = LocalDate.now()): Boolean {
+        val finaleDate = season.finaleDate ?: return false
+        return asOf.isEqual(finaleDate)
+    }
+
+    /**
+     * Checks if the season is complete (all episodes have aired).
+     * A season is complete if the finale date has passed or it's finale day.
+     */
+    fun isComplete(season: Season, asOf: LocalDate = LocalDate.now()): Boolean {
+        val finaleDate = season.finaleDate ?: return false
+        return !asOf.isBefore(finaleDate)  // true if asOf >= finaleDate
     }
 
     /**

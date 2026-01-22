@@ -37,6 +37,9 @@ interface SeasonDao {
     @Query("SELECT * FROM seasons WHERE state = :state")
     fun getSeasonsByState(state: SeasonState): Flow<List<Season>>
 
+    @Query("SELECT * FROM seasons WHERE state IN (:states)")
+    fun getSeasonsByStates(states: List<SeasonState>): Flow<List<Season>>
+
     @Query("UPDATE seasons SET watchedDate = :date, state = :state WHERE id = :seasonId")
     suspend fun markWatched(seasonId: Long, date: LocalDate, state: SeasonState = SeasonState.WATCHED)
 

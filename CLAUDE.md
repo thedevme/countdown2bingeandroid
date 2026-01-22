@@ -50,6 +50,22 @@ Wait for user approval of the plan before proceeding with implementation.
 
 ---
 
+## Phase Execution Workflow
+
+**At the start of each build plan phase:**
+
+1. **Present a summary** - Explain what the phase covers and its goals
+2. **Provide an implementation plan** with:
+   - Files to create (with purpose)
+   - Files to modify
+   - Implementation order (numbered steps in dependency order)
+   - Any decisions or clarifications needed
+3. **Wait for approval** - Do NOT begin coding until the user approves the plan
+4. **Execute autonomously** - Once approved, implement the phase without asking for confirmation on individual steps
+5. **End with phase completion** - Print "PHASE COMPLETE — READY FOR REVIEW" and play notification sound
+
+---
+
 ## Countdown2Binge Project Rules (Android)
 
 - The product specification in `/docs` is the source of truth for all product behavior.

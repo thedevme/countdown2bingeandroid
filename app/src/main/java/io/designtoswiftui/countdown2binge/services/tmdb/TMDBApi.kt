@@ -36,10 +36,26 @@ interface TMDBApi {
     ): TMDBSeasonDetails
 
     /**
-     * Get trending TV shows.
+     * Get trending TV shows for the day.
      */
-    @GET("trending/tv/week")
+    @GET("trending/tv/day")
     suspend fun getTrending(): TMDBSearchResponse
+
+    /**
+     * Get currently airing TV shows.
+     */
+    @GET("tv/on_the_air")
+    suspend fun getOnTheAir(
+        @Query("page") page: Int = 1
+    ): TMDBSearchResponse
+
+    /**
+     * Get images for a TV show (logos, backdrops, posters).
+     */
+    @GET("tv/{tv_id}/images")
+    suspend fun getShowImages(
+        @Path("tv_id") showId: Int
+    ): TMDBImagesResponse
 
     /**
      * Discover TV shows with various filters.
@@ -47,6 +63,32 @@ interface TMDBApi {
     @GET("discover/tv")
     suspend fun discover(
         @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("page") page: Int = 1,
+        @Query("with_genres") withGenres: String? = null
+    ): TMDBSearchResponse
+
+    /**
+     * Get videos (trailers, teasers, clips) for a TV show.
+     */
+    @GET("tv/{tv_id}/videos")
+    suspend fun getShowVideos(
+        @Path("tv_id") showId: Int
+    ): TMDBVideosResponse
+
+    /**
+     * Get credits (cast and crew) for a TV show.
+     */
+    @GET("tv/{tv_id}/credits")
+    suspend fun getShowCredits(
+        @Path("tv_id") showId: Int
+    ): TMDBCreditsResponse
+
+    /**
+     * Get recommended TV shows based on a specific show.
+     */
+    @GET("tv/{tv_id}/recommendations")
+    suspend fun getShowRecommendations(
+        @Path("tv_id") showId: Int,
         @Query("page") page: Int = 1
     ): TMDBSearchResponse
 }

@@ -5,9 +5,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -58,6 +60,12 @@ val bottomNavItems = listOf(
         label = "Search",
         selectedIcon = Icons.Filled.Search,
         unselectedIcon = Icons.Outlined.Search
+    ),
+    BottomNavItem(
+        route = Screen.Settings.route,
+        label = "Settings",
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings
     )
 )
 
@@ -129,6 +137,7 @@ fun shouldShowBottomBar(route: String?): Boolean {
     return route in listOf(
         Screen.Timeline.route,
         Screen.BingeReady.route,
-        Screen.Search.route
+        Screen.Search.route,
+        Screen.Settings.route
     )
 }

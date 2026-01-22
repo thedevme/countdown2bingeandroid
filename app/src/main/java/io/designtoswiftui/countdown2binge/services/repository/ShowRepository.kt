@@ -141,6 +141,17 @@ class ShowRepository @Inject constructor(
     }
 
     /**
+     * Get binge-ready seasons, optionally including airing seasons.
+     */
+    fun getBingeReadySeasons(includeAiring: Boolean): Flow<List<Season>> {
+        return if (includeAiring) {
+            seasonDao.getSeasonsByStates(listOf(SeasonState.BINGE_READY, SeasonState.AIRING))
+        } else {
+            seasonDao.getSeasonsByState(SeasonState.BINGE_READY)
+        }
+    }
+
+    /**
      * Get seasons by state.
      */
     fun getSeasonsByState(state: SeasonState): Flow<List<Season>> {

@@ -1,5 +1,8 @@
+@file:SuppressLint("NewApi")
+
 package io.designtoswiftui.countdown2binge.ui.timeline.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

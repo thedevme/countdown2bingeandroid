@@ -1,0 +1,2 @@
+json_key_file("") # Path to Google Play service account JSON (for Play Store - not needed for Firebase)
+package_name("io.designtoswiftui.countdown2binge")

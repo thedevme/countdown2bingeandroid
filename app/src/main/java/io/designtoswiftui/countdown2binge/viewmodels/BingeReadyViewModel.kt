@@ -8,11 +8,14 @@ import io.designtoswiftui.countdown2binge.models.SeasonState
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.services.RefreshService
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
+import io.designtoswiftui.countdown2binge.services.settings.SettingsRepository
 import io.designtoswiftui.countdown2binge.services.state.SeasonStateManager
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,7 +40,8 @@ data class BingeReadySeason(
 class BingeReadyViewModel @Inject constructor(
     private val repository: ShowRepository,
     private val stateManager: SeasonStateManager,
-    private val refreshService: RefreshService
+    private val refreshService: RefreshService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     // Binge-ready seasons with their shows
@@ -57,7 +61,12 @@ class BingeReadyViewModel @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
-        loadBingeReadySeasons()
+        // Observe settings changes and reload when includeAiring changes
+        viewModelScope.launch {
+            settingsRepository.includeAiring.collectLatest {
+                loadBingeReadySeasons()
+            }
+        }
     }
 
     /**
@@ -67,7 +76,8 @@ class BingeReadyViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
 
-            repository.getBingeReadySeasons().collect { seasons ->
+            val includeAiring = settingsRepository.includeAiring.first()
+            repository.getBingeReadySeasons(includeAiring).collect { seasons ->
                 if (seasons.isEmpty()) {
                     _isEmpty.value = true
                     _bingeReadySeasons.value = emptyList()

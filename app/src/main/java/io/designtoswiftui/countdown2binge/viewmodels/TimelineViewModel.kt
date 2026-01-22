@@ -192,9 +192,19 @@ class TimelineViewModel @Inject constructor(
             }
         }
 
-        // Sort by countdown
-        _airingShows.value = airing.sortedBy { it.daysUntilFinale ?: Int.MAX_VALUE }
-        _premieringShows.value = premiering.sortedBy { it.daysUntilPremiere ?: Int.MAX_VALUE }
+        // Sort by countdown - matching iOS logic:
+        // 1. Shows with dates first (sorted by days ascending)
+        // 2. TBD shows last (sorted alphabetically)
+        _airingShows.value = airing.sortedWith(compareBy(
+            { it.daysUntilFinale == null },  // false (has date) < true (TBD) - dated first
+            { it.daysUntilFinale ?: Int.MAX_VALUE },  // Sort by days
+            { it.show.title }  // Alphabetically for ties/TBD
+        ))
+        _premieringShows.value = premiering.sortedWith(compareBy(
+            { it.daysUntilPremiere == null },  // Dated first
+            { it.daysUntilPremiere ?: Int.MAX_VALUE },  // Sort by days
+            { it.show.title }  // Alphabetically for ties/TBD
+        ))
         _anticipatedShows.value = anticipated.sortedBy { it.show.title }
     }
 

@@ -1,8 +1,10 @@
-# Countdown2Binge Android — Build Plan v1 (Vertical Slices)
+# Countdown2Binge Android — Build Plan v2 (iOS Feature Parity)
 
-A sequential execution checklist optimized for **early Play Store builds**.
+A sequential execution checklist optimized for **early Play Store builds** with full iOS feature parity.
 
 **Philosophy:** Working features with basic UI first. Polish later.
+
+**Updated:** January 2026 — Added Cloud Sync, Localization, Account Management, and enhanced features from iOS.
 
 ---
 
@@ -19,9 +21,10 @@ A sequential execution checklist optimized for **early Play Store builds**.
 | **172** | **🚀 ALPHA 1 — Internal Testing** |
 | **226** | **🚀 ALPHA 2 — Mark Watched, Lifecycle** |
 | **290** | **🚀 BETA 1 — Gestures, Animations, Onboarding** |
-| **342** | **🚀 BETA 2 — Notifications, Settings** |
-| **410** | **🚀 RC — Monetization, Final Polish** |
-| **420** | **🎉 LAUNCH** |
+| **342** | **🚀 BETA 2 — Notifications Hub, Enhanced Settings** |
+| **410** | **🚀 BETA 3 — Cloud Sync, Account Management** |
+| **460** | **🚀 RC — Monetization, Localization** |
+| **500** | **🎉 LAUNCH** |
 
 ---
 
@@ -32,9 +35,10 @@ A sequential execution checklist optimized for **early Play Store builds**.
 | **Alpha 1** | End of Week 1 | 172 | Add shows, Timeline, Binge Ready, Show Detail (basic UI) |
 | **Alpha 2** | End of Week 2 | 226 | Mark watched, episode checklist, lifecycle complete |
 | **Beta 1** | End of Week 3 | 290 | Polished gestures, animations, onboarding |
-| **Beta 2** | End of Week 4 | 342 | Notifications, settings complete |
-| **RC** | Week 5-6 | 410 | Monetization, final polish |
-| **Launch** | Week 6 | 420 | Play Store release |
+| **Beta 2** | End of Week 4 | 342 | Notifications hub, enhanced settings |
+| **Beta 3** | End of Week 5 | 410 | Cloud sync, account management, Sign in with Google |
+| **RC** | Week 6-7 | 460 | Monetization, localization (16 languages) |
+| **Launch** | Week 7-8 | 500 | Play Store release |
 
 ---
 
@@ -851,7 +855,284 @@ A sequential execution checklist optimized for **early Play Store builds**.
 - [ ] 344. Wait for approval
 - [ ] 345. Release to production!
 
-**✅ 🎉 VERSION 1.0 SHIPPED (Step 420)**
+**✅ MILESTONE: Play Store Assets Ready (Step 345)**
+
+---
+
+## Week 5: Cloud Sync + Account Management → Beta 3
+
+---
+
+## Phase 40: Firebase Authentication (Sign in with Google)
+
+### 40.1 — Firebase Setup
+- [ ] 346. Add Firebase Auth dependency to build.gradle.kts
+- [ ] 347. Add google-services.json from Firebase Console
+- [ ] 348. Configure Sign in with Google in Firebase Console
+- [ ] 349. Create `services/auth/AuthState.kt` sealed class
+  - Cases: Unknown, SignedOut, SignedIn(userId, email)
+
+### 40.2 — Create AuthManager
+- [ ] 350. Create `services/auth/AuthManager.kt`
+- [ ] 351. Implement StateFlow: `authState`, `isLoading`, `error`
+- [ ] 352. Implement `suspend fun signInWithGoogle(activity: Activity)`
+- [ ] 353. Implement `fun signOut()`
+- [ ] 354. Implement `suspend fun deleteAccount()`
+- [ ] 355. Setup auth state listener with Firebase
+
+### 40.3 — Google Sign In Coordinator
+- [ ] 356. Create `services/auth/GoogleSignInCoordinator.kt`
+- [ ] 357. Configure Google Sign-In options
+- [ ] 358. Handle sign-in result
+- [ ] 359. Create Firebase credential from Google account
+- [ ] 360. Test sign-in flow end-to-end
+
+---
+
+## Phase 41: Cloud Sync Service
+
+### 41.1 — Firebase Realtime Database
+- [ ] 361. Add Firebase Database dependency
+- [ ] 362. Configure database rules (user-scoped read/write)
+- [ ] 363. Create `services/cloudsync/CloudSyncState.kt`
+  - Cases: Idle, Syncing, Synced(date), Error(message)
+
+### 41.2 — Create CloudSyncService
+- [ ] 364. Create `services/cloudsync/CloudSyncService.kt`
+- [ ] 365. StateFlow: `syncState`, `lastSyncedAt`
+- [ ] 366. Implement `suspend fun pushShowToCloud(tmdbId: Int)`
+- [ ] 367. Implement `suspend fun removeShowFromCloud(tmdbId: Int)`
+- [ ] 368. Implement `suspend fun fetchCloudShows(): List<Int>`
+- [ ] 369. Implement `suspend fun performFullSync()`
+
+### 41.3 — Sync Strategy (Union Merge)
+- [ ] 370. On sign-in: fetch local + cloud TMDB IDs
+- [ ] 371. Union merge: keep all shows from both sources
+- [ ] 372. Shows in cloud but not local → fetch from TMDB → save locally
+- [ ] 373. Shows in local but not cloud → push to Firebase
+- [ ] 374. Track pending operations for offline support
+
+### 41.4 — Network Monitoring
+- [ ] 375. Create `services/cloudsync/NetworkMonitor.kt`
+- [ ] 376. Use ConnectivityManager for network state
+- [ ] 377. Queue operations when offline
+- [ ] 378. Process queue when back online
+
+### 41.5 — Integration
+- [ ] 379. Update ShowRepository to trigger cloud sync on save/delete
+- [ ] 380. Add sync on app launch (if signed in + premium)
+- [ ] 381. Premium gate: only premium users can sync
+
+---
+
+## Phase 42: Account Management UI
+
+### 42.1 — Sign In Button Component
+- [ ] 382. Create `ui/components/SignInWithGoogleButton.kt`
+- [ ] 383. Follow Google's branding guidelines
+- [ ] 384. Show loading state during sign-in
+
+### 42.2 — Account Section (Settings)
+- [ ] 385. Create `ui/settings/AccountSection.kt`
+- [ ] 386. Signed out state: Sign in button + "Sync shows across devices" description
+- [ ] 387. Signed in state: Email row with navigation chevron
+- [ ] 388. Cloud sync status row with last synced time
+- [ ] 389. Premium badge for non-premium users
+
+### 42.3 — Account Detail Screen
+- [ ] 390. Create `ui/settings/AccountDetailScreen.kt`
+- [ ] 391. Account info section (email, provider)
+- [ ] 392. Cloud sync toggle + status
+- [ ] 393. Sign out button with confirmation
+- [ ] 394. Delete account button (required by Google Play)
+- [ ] 395. Re-authentication flow for deletion
+
+**✅ 🚀 BETA 3 — Cloud Sync, Account Management (Step 410)**
+
+---
+
+## Phase 43: Enhanced App Settings
+
+### 43.1 — Settings Data Model
+- [ ] 396. Create `services/AppSettings.kt` using DataStore
+- [ ] 397. Properties: countdownDisplayMode (DAYS, EPISODES)
+- [ ] 398. Properties: soundEnabled, hapticsEnabled
+- [ ] 399. Properties: seasonDisplayOrder (FIRST, CURRENT) for airing shows
+- [ ] 400. Properties: seasonDisplayOrder (FIRST, CURRENT) for ended shows
+- [ ] 401. Properties: showAiringSeasonsInBingeReady
+
+### 43.2 — Countdown Display Mode
+- [ ] 402. Create `ui/settings/CountdownModeSection.kt`
+- [ ] 403. Segmented control: "Days" / "Episodes"
+- [ ] 404. Update CountdownText to use setting
+
+### 43.3 — Sound & Haptics
+- [ ] 405. Create `services/SoundManager.kt`
+- [ ] 406. Create `services/HapticsManager.kt`
+- [ ] 407. Add toggles to Settings screen
+- [ ] 408. Apply to card swipes and animations
+
+### 43.4 — Season Display Order
+- [ ] 409. Create `ui/settings/SeasonOrderSection.kt`
+- [ ] 410. Settings for airing shows: First Season / Current Season
+- [ ] 411. Settings for ended shows: First Season / Current Season
+- [ ] 412. Toggle: Show airing seasons in Binge Ready
+- [ ] 413. Update BingeReadyViewModel to respect settings
+
+---
+
+## Phase 44: Streaming Deep Links
+
+### 44.1 — Deep Link Service
+- [ ] 414. Create `services/StreamingDeepLinkService.kt`
+- [ ] 415. Support: Netflix, Prime Video, Disney+, Max, Hulu
+- [ ] 416. Support: Peacock, Paramount+, Apple TV+, Crunchyroll, YouTube
+- [ ] 417. Detect installed apps via package manager
+- [ ] 418. Fallback to web URLs
+
+### 44.2 — TMDB Watch Providers
+- [ ] 419. Add TMDB watch providers endpoint
+- [ ] 420. Fetch available providers for show
+- [ ] 421. Region-aware provider lookup
+- [ ] 422. Cache providers locally
+
+### 44.3 — UI Integration
+- [ ] 423. Create `ui/showdetail/StreamingProvidersRow.kt`
+- [ ] 424. Show provider logos
+- [ ] 425. Tap to open streaming app
+
+---
+
+## Week 6-7: Monetization + Localization → RC
+
+---
+
+## Phase 45: RevenueCat Integration (Premium)
+
+### 45.1 — Configure RevenueCat
+- [ ] 426. Add RevenueCat SDK via Gradle
+- [ ] 427. Create RevenueCat account + app
+- [ ] 428. Configure entitlement: "premium"
+- [ ] 429. Configure offering with subscription
+- [ ] 430. Configure 7-day free trial
+- [ ] 431. Initialize in Application class
+
+### 45.2 — Create PremiumManager
+- [ ] 432. Create `services/PremiumManager.kt`
+- [ ] 433. StateFlow: `isPremium`, `isInTrial`, `trialExpirationDate`
+- [ ] 434. Method: `suspend fun checkEntitlements()`
+- [ ] 435. Method: `suspend fun purchase(activity: Activity)`
+- [ ] 436. Method: `suspend fun restorePurchases()`
+
+### 45.3 — Premium Features Gate
+- [ ] 437. Free tier: 3 shows max (vs iOS 3)
+- [ ] 438. Free tier: No notifications
+- [ ] 439. Free tier: No cloud sync
+- [ ] 440. Free tier: No countdowns (just status text)
+- [ ] 441. Add checks in AddShowUseCase
+- [ ] 442. Add upgrade prompts in UI
+
+### 45.4 — Paywall Screen
+- [ ] 443. Create `ui/premium/PaywallScreen.kt`
+- [ ] 444. Feature showcase section
+- [ ] 445. Pricing cards with trial info
+- [ ] 446. Purchase button with loading state
+- [ ] 447. Restore purchases button
+- [ ] 448. Legal links (terms, privacy)
+
+### 45.5 — Show Limit UI
+- [ ] 449. Create `ui/premium/ShowLimitBanner.kt`
+- [ ] 450. Display when at show limit
+- [ ] 451. Navigate to paywall on tap
+
+---
+
+## Phase 46: Localization (16 Languages)
+
+### 46.1 — Setup
+- [ ] 452. Create `res/values/strings.xml` (English base)
+- [ ] 453. Extract all hardcoded strings to resources
+- [ ] 454. Create `res/values-es/strings.xml` (Spanish)
+- [ ] 455. Create `res/values-fr/strings.xml` (French)
+- [ ] 456. Create `res/values-de/strings.xml` (German)
+- [ ] 457. Create `res/values-it/strings.xml` (Italian)
+- [ ] 458. Create `res/values-pt-rBR/strings.xml` (Portuguese-Brazil)
+
+### 46.2 — Asian Languages
+- [ ] 459. Create `res/values-ja/strings.xml` (Japanese)
+- [ ] 460. Create `res/values-ko/strings.xml` (Korean)
+- [ ] 461. Create `res/values-zh-rCN/strings.xml` (Chinese Simplified)
+- [ ] 462. Create `res/values-th/strings.xml` (Thai)
+
+### 46.3 — Additional Languages
+- [ ] 463. Create `res/values-ar/strings.xml` (Arabic - RTL support)
+- [ ] 464. Create `res/values-nl/strings.xml` (Dutch)
+- [ ] 465. Create `res/values-pl/strings.xml` (Polish)
+- [ ] 466. Create `res/values-ru/strings.xml` (Russian)
+- [ ] 467. Create `res/values-tr/strings.xml` (Turkish)
+
+### 46.4 — RTL Support
+- [ ] 468. Enable RTL support in AndroidManifest.xml
+- [ ] 469. Test Arabic layout
+- [ ] 470. Fix any RTL layout issues
+
+**✅ 🚀 RC — Monetization, Localization (Step 460)**
+
+---
+
+## Phase 47: Final Polish
+
+### 47.1 — Demo Mode (Debug Builds)
+- [ ] 471. Create `demo/DemoModeProvider.kt`
+- [ ] 472. Create mock show data for demos
+- [ ] 473. Add shake gesture to toggle demo mode
+- [ ] 474. Show demo indicator in debug builds
+
+### 47.2 — Franchise/Spinoff Support (Future)
+- [ ] 475. Create `models/Franchise.kt`
+- [ ] 476. Create `services/FranchiseService.kt`
+- [ ] 477. Link related shows
+- [ ] 478. Display franchise info in Show Detail
+
+### 47.3 — Google Assistant Actions (Future)
+- [ ] 479. Create App Actions for voice commands
+- [ ] 480. "Add [show name] to Countdown2Binge"
+- [ ] 481. "What's ready to binge?"
+
+### 47.4 — Accessibility
+- [ ] 482. Add contentDescription to all interactive elements
+- [ ] 483. Test with TalkBack
+- [ ] 484. Test with font scaling
+- [ ] 485. Check contrast ratios
+
+### 47.5 — Performance
+- [ ] 486. Profile with Android Profiler
+- [ ] 487. Fix memory leaks
+- [ ] 488. Optimize image loading
+
+---
+
+## Phase 48: Play Store Submission
+
+### 48.1 — Play Store Assets
+- [ ] 489. Create screenshots (phone, 7" tablet, 10" tablet)
+- [ ] 490. Create feature graphic (1024x500)
+- [ ] 491. Write app description (all 16 languages)
+- [ ] 492. Write short description
+- [ ] 493. Add keywords/tags
+
+### 48.2 — Final Build
+- [ ] 494. Set versionCode to final
+- [ ] 495. Set versionName to "1.0.0"
+- [ ] 496. Generate signed AAB
+- [ ] 497. Full QA pass
+
+### 48.3 — Submit
+- [ ] 498. Complete Play Store listing
+- [ ] 499. Submit for review
+- [ ] 500. Release to production!
+
+**✅ 🎉 VERSION 1.0 SHIPPED (Step 500)**
 
 ---
 
@@ -862,10 +1143,12 @@ A sequential execution checklist optimized for **early Play Store builds**.
 | 1 | Core + Basic UI | 1-162 | Alpha 1 (Internal) |
 | 2 | Complete Lifecycle | 163-198 | Alpha 2 |
 | 3 | Polish + Onboarding | 199-230 | Beta 1 (Closed) |
-| 4 | Settings + Notifications | 231-270 | Beta 2 |
-| 5-6 | Monetization + Final | 271-345 | RC → Launch |
+| 4 | Notifications Hub + Settings | 231-345 | Beta 2 |
+| 5 | Cloud Sync + Account | 346-425 | Beta 3 |
+| 6-7 | Monetization + Localization | 426-488 | RC |
+| 7-8 | Final Polish + Launch | 489-500 | Launch |
 
-**Total: ~345 steps** (consolidated from iOS 420 due to platform differences)
+**Total: ~500 steps** (with full iOS feature parity)
 
 ---
 

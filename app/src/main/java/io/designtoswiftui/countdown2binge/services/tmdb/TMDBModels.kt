@@ -27,7 +27,8 @@ data class TMDBSearchResult(
     @Json(name = "first_air_date") val firstAirDate: String?,
     @Json(name = "vote_average") val voteAverage: Double?,
     @Json(name = "vote_count") val voteCount: Int?,
-    val popularity: Double?
+    val popularity: Double?,
+    @Json(name = "genre_ids") val genreIds: List<Int>? = null
 )
 
 /**
@@ -136,4 +137,98 @@ data class TMDBGenre(
 data class FullShowData(
     val showDetails: TMDBShowDetails,
     val latestSeasonDetails: TMDBSeasonDetails?
+)
+
+/**
+ * Response from TMDB images endpoint.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBImagesResponse(
+    val id: Int,
+    val logos: List<TMDBLogo>?,
+    val backdrops: List<TMDBImage>?,
+    val posters: List<TMDBImage>?
+)
+
+/**
+ * Logo image from TMDB.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBLogo(
+    @Json(name = "file_path") val filePath: String,
+    @Json(name = "iso_639_1") val languageCode: String?,
+    val width: Int?,
+    val height: Int?,
+    @Json(name = "aspect_ratio") val aspectRatio: Double?
+)
+
+/**
+ * Generic image from TMDB (backdrop or poster).
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBImage(
+    @Json(name = "file_path") val filePath: String,
+    @Json(name = "iso_639_1") val languageCode: String?,
+    val width: Int?,
+    val height: Int?,
+    @Json(name = "aspect_ratio") val aspectRatio: Double?
+)
+
+/**
+ * Response from TMDB videos endpoint.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBVideosResponse(
+    val id: Int,
+    val results: List<TMDBVideo>
+)
+
+/**
+ * Video/trailer from TMDB.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBVideo(
+    val id: String,
+    val key: String,           // YouTube video ID
+    val name: String,
+    val site: String,          // "YouTube"
+    val type: String,          // "Trailer", "Teaser", "Clip"
+    val official: Boolean?
+) {
+    val youtubeUrl: String get() = "https://www.youtube.com/watch?v=$key"
+    val thumbnailUrl: String get() = "https://img.youtube.com/vi/$key/mqdefault.jpg"
+}
+
+/**
+ * Response from TMDB credits endpoint.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBCreditsResponse(
+    val id: Int,
+    val cast: List<TMDBCastMember>,
+    val crew: List<TMDBCrewMember>
+)
+
+/**
+ * Cast member from TMDB.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBCastMember(
+    val id: Int,
+    val name: String,
+    val character: String?,
+    @Json(name = "profile_path") val profilePath: String?,
+    val order: Int?
+)
+
+/**
+ * Crew member from TMDB.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBCrewMember(
+    val id: Int,
+    val name: String,
+    val job: String?,
+    val department: String?,
+    @Json(name = "profile_path") val profilePath: String?
 )
