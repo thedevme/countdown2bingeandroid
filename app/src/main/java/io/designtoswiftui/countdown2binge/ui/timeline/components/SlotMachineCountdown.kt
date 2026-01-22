@@ -1,5 +1,7 @@
 package io.designtoswiftui.countdown2binge.ui.timeline.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -20,19 +23,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.designtoswiftui.countdown2binge.models.CountdownDisplayMode
 import io.designtoswiftui.countdown2binge.ui.theme.Background
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
-
-/**
- * Display mode for the slot machine countdown.
- */
-enum class CountdownDisplayMode {
-    DAYS,
-    EPISODES
-}
+import kotlin.math.roundToInt
 
 // Design spec colors
 private val UnitLabelColor = Color(0xFF808080)       // White 50%
@@ -45,17 +41,17 @@ private val CellWidth = 90.dp
 private val CellHeight = 90.dp
 private val CenterBoxCornerRadius = 12.dp
 
+// Animation spec
+private const val ANIMATION_DURATION_MS = 400
+
 /**
- * Slot machine style number strip - shows 5 numbers with center highlighted in a box.
- * Header ("FINALE" / "EPISODE IN") is handled by parent CountdownLabel component.
+ * Slot machine style countdown with horizontal scroll animation.
  *
- * Design spec:
- * - 5 visible numbers centered around current value
- * - Center number in dark box (90x100dp, 12dp radius, #0D0D0D fill, #252525 border)
- * - Outer numbers fade via alpha (0.35 adjacent, 0.15 far)
- * - Numbers: 61sp heavy, white
- * - TBD: 51sp heavy, white
- * - Unit: 9sp semibold, #808080, tracking 1.5
+ * When the value changes, the number strip scrolls horizontally:
+ * - Value increases → strip moves LEFT (higher numbers scroll in from right)
+ * - Value decreases → strip moves RIGHT (lower numbers scroll in from left)
+ *
+ * The center box stays fixed while numbers scroll behind it.
  *
  * @param value The current countdown value (days or episodes), null for TBD
  * @param mode Whether to display as "DAYS" or "EPS"
@@ -79,61 +75,52 @@ fun SlotMachineCountdown(
         else -> value
     }
 
-    // Number strip - each cell positioned relative to center
+    // Animate the position (0-100 range)
+    val animatedPosition by animateFloatAsState(
+        targetValue = displayValue.toFloat(),
+        animationSpec = tween(
+            durationMillis = ANIMATION_DURATION_MS,
+            easing = androidx.compose.animation.core.EaseOut
+        ),
+        label = "slotMachineScroll"
+    )
+
+    val density = LocalDensity.current
+    val cellWidthPx = with(density) { CellWidth.toPx() }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(CellHeight)
     ) {
-        val screenCenter = maxWidth / 2
-        val cellHalf = CellWidth / 2
+        val screenCenterPx = with(density) { (maxWidth / 2).toPx() }
+        val cellHalfPx = cellWidthPx / 2
 
-        // 5 positions: -2, -1, center(0), +1, +2
-        listOf(-2, -1, 0, 1, 2).forEach { position ->
-            val num = if (displayValue >= 100) {
-                when (position) {
-                    -2 -> 97
-                    -1 -> 98
-                    0 -> 100
-                    else -> 101
-                }
-            } else {
-                displayValue + position
-            }
+        // Calculate which numbers are visible (render extra for smooth animation)
+        val centerNumber = animatedPosition.roundToInt()
+        val visibleRange = (centerNumber - 3)..(centerNumber + 3)
 
-            val isCenter = position == 0
-            val alpha = when (kotlin.math.abs(position)) {
-                0 -> 1f
-                1 -> 0.35f
+        // Render each visible number cell
+        visibleRange.forEach { number ->
+            // Skip invalid numbers
+            if (number < 0 || number > 100) return@forEach
+
+            // Calculate position based on animated value
+            // When animatedPosition = number, that number should be in center
+            val offsetFromCenter = number - animatedPosition
+            val xOffsetPx = screenCenterPx - cellHalfPx + (offsetFromCenter * cellWidthPx)
+            val xOffset = with(density) { xOffsetPx.toDp() }
+
+            // Calculate alpha based on distance from center
+            val distanceFromCenter = kotlin.math.abs(offsetFromCenter)
+            val alpha = when {
+                distanceFromCenter < 0.5f -> 1f
+                distanceFromCenter < 1.5f -> 0.35f
                 else -> 0.15f
             }
 
-            // Calculate X offset: center of screen minus half cell width plus position offset
-            val xOffset = screenCenter - cellHalf + (CellWidth * position)
-
-            if (isCenter) {
-                Box(
-                    modifier = Modifier
-                        .offset(x = xOffset)
-                        .size(CellWidth, CellHeight)
-                        .background(
-                            color = CenterBoxFill,
-                            shape = RoundedCornerShape(CenterBoxCornerRadius)
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = CenterBoxBorder,
-                            shape = RoundedCornerShape(CenterBoxCornerRadius)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    NumberCellContent(
-                        number = displayValue,
-                        unitLabel = unitLabel,
-                        isTbd = displayValue >= 100
-                    )
-                }
-            } else {
+            // Render cell (non-center cells only - center box is overlaid)
+            if (distanceFromCenter > 0.1f) {
                 Box(
                     modifier = Modifier
                         .offset(x = xOffset)
@@ -142,12 +129,38 @@ fun SlotMachineCountdown(
                     contentAlignment = Alignment.Center
                 ) {
                     NumberCellContent(
-                        number = num,
+                        number = number,
                         unitLabel = unitLabel,
-                        isTbd = num >= 100
+                        isTbd = number >= 100
                     )
                 }
             }
+        }
+
+        // Static center box overlay (always shows current animated value)
+        val centerXOffset = with(density) { (screenCenterPx - cellHalfPx).toDp() }
+        Box(
+            modifier = Modifier
+                .offset(x = centerXOffset)
+                .size(CellWidth, CellHeight)
+                .background(
+                    color = CenterBoxFill,
+                    shape = RoundedCornerShape(CenterBoxCornerRadius)
+                )
+                .border(
+                    width = 1.dp,
+                    color = CenterBoxBorder,
+                    shape = RoundedCornerShape(CenterBoxCornerRadius)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Show the number closest to center during animation
+            val centerDisplayNumber = animatedPosition.roundToInt().coerceIn(0, 100)
+            NumberCellContent(
+                number = centerDisplayNumber,
+                unitLabel = unitLabel,
+                isTbd = centerDisplayNumber >= 100
+            )
         }
     }
 }
@@ -171,11 +184,11 @@ private fun NumberCellContent(
                 number < 0 -> ""
                 else -> String.format("%02d", number)
             },
-            fontSize = if (isTbd || number >= 100) 51.sp else 61.sp,
+            fontSize = if (isTbd || number >= 100) 36.sp else 61.sp,
             fontWeight = FontWeight.Black,
             color = NumberColor,
             textAlign = TextAlign.Center,
-            letterSpacing = (-1).sp
+            letterSpacing = if (isTbd || number >= 100) 0.sp else (-1).sp
         )
 
         if (number >= 0) {

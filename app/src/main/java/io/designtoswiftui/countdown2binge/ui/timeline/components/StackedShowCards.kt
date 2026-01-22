@@ -105,20 +105,29 @@ fun StackedShowCards(
                     onDragEnd = {
                         val offset = dragOffset.value
                         scope.launch {
-                            val newIndex = when {
-                                offset < -thresholdPx -> (currentIndex + 1) % count
-                                offset > thresholdPx -> (currentIndex - 1 + count) % count
-                                else -> currentIndex
+                            val swipeDirection = when {
+                                offset < -thresholdPx -> 1   // Swipe left = next
+                                offset > thresholdPx -> -1   // Swipe right = prev
+                                else -> 0                    // No change
                             }
+
+                            val newIndex = (currentIndex + swipeDirection + count) % count
 
                             if (newIndex != currentIndex) {
                                 currentIndex = newIndex
                                 onPageChanged?.invoke(currentIndex)
                             }
 
-                            // Animate BOTH together - dragOffset continues the outgoing card's motion
-                            // while animatedIndex slides all cards to new positions
-                            launch { animatedIndex.animateTo(newIndex.toFloat(), cardSpring) }
+                            // Animate in swipe direction (avoids 3→0 going through 2,1)
+                            // Instead of animating to newIndex directly, animate by direction
+                            // e.g., from 3 swipe left: animate to 4.0, then snap to 0.0
+                            val animTarget = animatedIndex.value + swipeDirection
+
+                            launch {
+                                animatedIndex.animateTo(animTarget, cardSpring)
+                                // Snap to actual index after animation (keeps value in 0..count-1 range)
+                                animatedIndex.snapTo(newIndex.toFloat())
+                            }
                             launch { dragOffset.animateTo(0f, cardSpring) }
                         }
                     },

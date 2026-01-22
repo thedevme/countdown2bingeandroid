@@ -84,8 +84,8 @@ private val cardSpring = spring<Float>(
  * Cards wrap around infinitely - swiping past the last card goes to the first.
  *
  * Gestures:
- * - Swipe LEFT: Next season
- * - Swipe RIGHT: Previous season
+ * - Swipe RIGHT: Next season (1→2→3)
+ * - Swipe LEFT: Previous season (3→2→1)
  * - Swipe UP: Mark season watched
  * - Swipe DOWN: Delete show (with confirmation)
  */
@@ -173,16 +173,24 @@ fun BingeReadyCardStack(
                                     launch { dragOffsetY.animateTo(0f, cardSpring) }
                                 }
                                 GestureDirection.Horizontal -> {
-                                    val newIndex = when {
-                                        offsetX < -thresholdPx -> (visualIndex + 1) % count
-                                        offsetX > thresholdPx -> (visualIndex - 1 + count) % count
-                                        else -> visualIndex
+                                    // Swipe RIGHT = next season, Swipe LEFT = prev season
+                                    val swipeDirection = when {
+                                        offsetX > thresholdPx -> 1    // Swipe right = next
+                                        offsetX < -thresholdPx -> -1  // Swipe left = prev
+                                        else -> 0
                                     }
+                                    val newIndex = (visualIndex + swipeDirection + count) % count
 
                                     if (newIndex != visualIndex) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                         lastAnimatedIndex = newIndex
-                                        launch { animatedIndex.animateTo(newIndex.toFloat(), cardSpring) }
+
+                                        // Animate in swipe direction (avoids wrap-around cycling through all cards)
+                                        val animTarget = animatedIndex.value + swipeDirection
+                                        launch {
+                                            animatedIndex.animateTo(animTarget, cardSpring)
+                                            animatedIndex.snapTo(newIndex.toFloat())
+                                        }
                                         onIndexChange(newIndex)
                                     }
 
