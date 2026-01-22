@@ -2,11 +2,11 @@ package io.designtoswiftui.countdown2binge.ui.navigation
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CalendarViewDay
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -44,14 +44,14 @@ val bottomNavItems = listOf(
     BottomNavItem(
         route = Screen.Timeline.route,
         label = "Timeline",
-        selectedIcon = Icons.Filled.DateRange,
-        unselectedIcon = Icons.Outlined.DateRange
+        selectedIcon = Icons.Filled.CalendarViewDay,
+        unselectedIcon = Icons.Outlined.CalendarViewDay
     ),
     BottomNavItem(
         route = Screen.BingeReady.route,
         label = "Binge Ready",
-        selectedIcon = Icons.Filled.Check,
-        unselectedIcon = Icons.Outlined.Check
+        selectedIcon = Icons.Filled.CalendarToday,
+        unselectedIcon = Icons.Outlined.CalendarToday
     ),
     BottomNavItem(
         route = Screen.Search.route,

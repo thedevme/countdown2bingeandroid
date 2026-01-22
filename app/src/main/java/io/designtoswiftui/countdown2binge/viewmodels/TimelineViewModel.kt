@@ -26,7 +26,9 @@ data class TimelineShow(
     val season: Season?,
     val daysUntilPremiere: Int?,
     val daysUntilFinale: Int?,
-    val episodesRemaining: Int?
+    val episodesRemaining: Int?,
+    /** Computed next season number for TBD display (current + 1, or 1 if no seasons) */
+    val anticipatedSeasonNumber: Int
 )
 
 /**
@@ -101,12 +103,23 @@ class TimelineViewModel @Inject constructor(
                         .maxByOrNull { it.seasonNumber }
                         ?: seasons.maxByOrNull { it.seasonNumber }
 
+                    // Calculate anticipated season number for TBD display
+                    // If show is in Anticipated state, this shows the NEXT season (current + 1)
+                    val anticipatedSeasonNumber = when {
+                        // If there's an upcoming season with data, use it
+                        // (future: could check for seasons with no premiere date)
+                        // For now, use current season + 1, or 1 if no seasons
+                        relevantSeason != null -> relevantSeason.seasonNumber + 1
+                        else -> 1  // No seasons at all = S1 TBD
+                    }
+
                     val timelineShow = TimelineShow(
                         show = show,
                         season = relevantSeason,
                         daysUntilPremiere = relevantSeason?.let { stateManager.daysUntilPremiere(it, today) },
                         daysUntilFinale = relevantSeason?.let { stateManager.daysUntilFinale(it, today) },
-                        episodesRemaining = relevantSeason?.let { stateManager.episodesRemaining(it) }
+                        episodesRemaining = relevantSeason?.let { stateManager.episodesRemaining(it) },
+                        anticipatedSeasonNumber = anticipatedSeasonNumber
                     )
                     timelineShows.add(timelineShow)
                 }

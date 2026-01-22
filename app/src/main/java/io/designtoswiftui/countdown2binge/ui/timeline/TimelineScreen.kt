@@ -198,7 +198,8 @@ private fun TimelineContent(
         anticipatedShows.map { show ->
             TimelineEntry(
                 showId = show.show.id,
-                seasonNumber = show.season?.seasonNumber ?: 1,
+                // Use anticipatedSeasonNumber for TBD shows (shows next season: S3 finished → S4 TBD)
+                seasonNumber = show.anticipatedSeasonNumber,
                 backdropUrl = show.show.backdropPath?.let {
                     "${TMDBService.IMAGE_BASE_URL}${TMDBService.BACKDROP_SIZE}$it"
                 },
