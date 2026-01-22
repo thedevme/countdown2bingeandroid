@@ -24,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import io.designtoswiftui.countdown2binge.ui.theme.BingeReadyAccent
 import io.designtoswiftui.countdown2binge.ui.theme.CardBackground
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
 
@@ -69,7 +68,7 @@ fun ShowSelector(
     LazyRow(
         state = listState,
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 20.dp)
     ) {
         itemsIndexed(
@@ -97,20 +96,20 @@ private fun ShowThumbnail(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Thumbnail dimensions: 48×72 (1.5:1 ratio)
-    val thumbnailWidth = 48.dp
-    val thumbnailHeight = 72.dp
+    // Thumbnail dimensions: 56×84 (per iOS spec)
+    val thumbnailWidth = 56.dp
+    val thumbnailHeight = 84.dp
 
     Box(
         modifier = modifier
             .width(thumbnailWidth)
             .height(thumbnailHeight)
-            .alpha(if (isSelected) 1f else 0.5f)
+            .alpha(if (isSelected) 1f else 0.6f)
             .then(
                 if (isSelected) {
                     Modifier.border(
                         width = 2.dp,
-                        color = BingeReadyAccent,
+                        color = Color.White,
                         shape = RoundedCornerShape(8.dp)
                     )
                 } else {

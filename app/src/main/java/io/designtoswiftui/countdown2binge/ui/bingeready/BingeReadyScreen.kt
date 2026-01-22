@@ -1,5 +1,16 @@
 package io.designtoswiftui.countdown2binge.ui.bingeready
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +67,14 @@ import io.designtoswiftui.countdown2binge.viewmodels.BingeReadySeason
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadyViewModel
 
 /**
+ * Navigation direction for card drop transitions.
+ */
+private enum class NavigationDirection {
+    FORWARD,  // Cards drop from top, exit to bottom
+    BACKWARD  // Cards rise from bottom, exit to top
+}
+
+/**
  * Data class to group seasons by show for the card stack.
  */
 private data class ShowWithSeasons(
@@ -108,8 +127,13 @@ fun BingeReadyScreen(
     var selectedShowIndex by remember { mutableIntStateOf(0) }
     var currentSeasonIndex by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var navigationDirection by remember { mutableStateOf(NavigationDirection.FORWARD) }
 
     // Reset season index when show changes
+    LaunchedEffect(selectedShowIndex) {
+        currentSeasonIndex = 0
+    }
+
     val selectedShow = showsWithSeasons.getOrNull(selectedShowIndex)
 
     Box(
@@ -130,9 +154,17 @@ fun BingeReadyScreen(
                         showsWithSeasons = showsWithSeasons,
                         selectedShowIndex = selectedShowIndex,
                         currentSeasonIndex = currentSeasonIndex,
-                        onShowSelected = { index ->
-                            selectedShowIndex = index
-                            currentSeasonIndex = 0 // Reset to first season when switching shows
+                        navigationDirection = navigationDirection,
+                        onShowSelected = { targetIndex ->
+                            if (targetIndex == selectedShowIndex) return@BingeReadyContent
+                            // Set direction FIRST (before index change)
+                            navigationDirection = if (targetIndex > selectedShowIndex) {
+                                NavigationDirection.FORWARD
+                            } else {
+                                NavigationDirection.BACKWARD
+                            }
+                            // Then update index (triggers AnimatedContent)
+                            selectedShowIndex = targetIndex
                         },
                         onSeasonChanged = { currentSeasonIndex = it },
                         onMarkWatched = { season ->
@@ -168,12 +200,14 @@ private fun BingeReadyContent(
     showsWithSeasons: List<ShowWithSeasons>,
     selectedShowIndex: Int,
     currentSeasonIndex: Int,
+    navigationDirection: NavigationDirection,
     onShowSelected: (Int) -> Unit,
     onSeasonChanged: (Int) -> Unit,
     onMarkWatched: (BingeReadySeasonData) -> Unit,
     onDeleteShow: () -> Unit,
     onCardClick: (BingeReadySeasonData) -> Unit
 ) {
+
     val selectedShow = showsWithSeasons.getOrNull(selectedShowIndex) ?: return
     val currentSeason = selectedShow.seasons.getOrNull(currentSeasonIndex)
 
@@ -259,22 +293,6 @@ private fun BingeReadyContent(
         }
     }
 
-    // Convert to BingeReadySeasonData for the card stack
-    val seasonData = remember(selectedShow) {
-        selectedShow.seasons.map { bingeReadySeason ->
-            BingeReadySeasonData(
-                showId = bingeReadySeason.show.id,
-                seasonId = bingeReadySeason.season.id,
-                seasonNumber = bingeReadySeason.season.seasonNumber,
-                posterUrl = (bingeReadySeason.season.posterPath ?: bingeReadySeason.show.posterPath)?.let {
-                    "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
-                },
-                title = bingeReadySeason.show.title,
-                episodesRemaining = bingeReadySeason.season.episodeCount
-            )
-        }
-    }
-
     // Convert to ShowThumbnailData for the selector
     val showThumbnails = remember(showsWithSeasons) {
         showsWithSeasons.map { show ->
@@ -293,6 +311,9 @@ private fun BingeReadyContent(
         val cardWidth = maxWidth * 0.7f
         val cardHeight = cardWidth * 1.5f
 
+        // Calculate scale factor based on screen height (similar to iOS)
+        val scaleFactor = (maxHeight / 800.dp).coerceIn(0.8f, 1.2f)
+
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -302,38 +323,82 @@ private fun BingeReadyContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Show Title (above card stack)
-            Text(
-                text = selectedShow.showTitle.uppercase(),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                letterSpacing = 0.5.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp)
-            )
+            // Card drop animation with FIXED offsets (not based on distance)
+            // Like iOS .id(currentShowIndex) - same visual transition every time
+            AnimatedContent(
+                targetState = selectedShowIndex,
+                transitionSpec = {
+                    val isForward = navigationDirection == NavigationDirection.FORWARD
 
-            Spacer(modifier = Modifier.weight(1f))
+                    // FIXED offset values in dp - same every time regardless of jump distance
+                    val enterOffsetDp = if (isForward) -250 else 250
+                    val exitOffsetDp = if (isForward) 350 else -350
 
-            // Card Stack
-            BingeReadyCardStack(
-                seasons = seasonData,
-                currentIndex = currentSeasonIndex,
-                onIndexChange = onSeasonChanged,
-                onMarkWatched = { season ->
-                    // Trigger fill animation first
-                    markingWatchedSeason = season
+                    val enter = slideInVertically(
+                        initialOffsetY = { enterOffsetDp * 3 },  // Fixed dp value
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) +
+                      scaleIn(initialScale = 0.8f, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+
+                    val exit = slideOutVertically(
+                        targetOffsetY = { exitOffsetDp * 3 },  // Fixed dp value
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) +
+                      scaleOut(targetScale = 0.8f, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+
+                    (enter togetherWith exit).using(SizeTransform(clip = false))
                 },
-                onDelete = onDeleteShow,
-                onCardClick = onCardClick,
-                cardSize = DpSize(cardWidth, cardHeight)
-            )
+                label = "cardDropTransition",
+                modifier = Modifier.weight(1f)
+            ) { showIndex ->
+                val animatedShow = showsWithSeasons.getOrNull(showIndex) ?: return@AnimatedContent
+                val animatedSeasonData = animatedShow.seasons.map { bingeReadySeason ->
+                    BingeReadySeasonData(
+                        showId = bingeReadySeason.show.id,
+                        seasonId = bingeReadySeason.season.id,
+                        seasonNumber = bingeReadySeason.season.seasonNumber,
+                        posterUrl = (bingeReadySeason.season.posterPath ?: bingeReadySeason.show.posterPath)?.let {
+                            "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
+                        },
+                        title = bingeReadySeason.show.title,
+                        episodesRemaining = bingeReadySeason.season.episodeCount
+                    )
+                }
 
-            Spacer(modifier = Modifier.weight(1f))
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = animatedShow.showTitle.uppercase(),
+                        fontSize = (22 * scaleFactor).sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        letterSpacing = 0.5.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 40.dp)
+                    )
 
-            // Episode Progress Bar
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    BingeReadyCardStack(
+                        seasons = animatedSeasonData,
+                        currentIndex = if (showIndex == selectedShowIndex) currentSeasonIndex else 0,
+                        onIndexChange = onSeasonChanged,
+                        onMarkWatched = { season -> markingWatchedSeason = season },
+                        onDelete = onDeleteShow,
+                        onCardClick = onCardClick,
+                        cardSize = DpSize(cardWidth, cardHeight)
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+
+            // Episode Progress Bar (outside AnimatedContent for smoother updates)
             if (currentSeason != null) {
                 // Determine watched count:
                 // - If marking this season watched, show full (triggers fill animation)
@@ -353,13 +418,14 @@ private fun BingeReadyContent(
                     showKey = selectedShow.showId,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 40.dp)
+                        .padding(horizontal = 30.dp)
+                        .padding(top = (24 * scaleFactor).dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Show Selector
+            // Show Selector (Thumbnail Nav) - highlights target immediately
             ShowSelector(
                 shows = showThumbnails,
                 selectedIndex = selectedShowIndex,
