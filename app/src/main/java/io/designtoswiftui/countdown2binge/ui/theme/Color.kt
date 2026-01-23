@@ -52,12 +52,21 @@ val BingeReadyAccent = Color(0xFF2BAFA9)  // Teal accent for binge ready element
 val BingeReadyBackground = Color(0xFF000000)  // Pure black background
 
 // Timeline section-specific colors (matching iOS)
+val EndingSoonAccent = Color(0xFF73E6B3)      // Teal-green for ending soon (same as premiering)
 val PremieringSoonAccent = Color(0xFF73E6B3)  // Teal-green for premiering soon
 val AnticipatedAccent = Color(0xFF666666)      // Muted gray for anticipated/TBD
 
 // Gradients
 val GradientOverlayStart = Color(0x00000000)
 val GradientOverlayEnd = Color(0xE6000000)
+
+// Footer button colors (matching iOS spec)
+val FooterButtonBackground = Color(0xFF0D0D0D)
+val FooterButtonBorder = Color(0xFF252525)
+
+// Text colors for Timeline UI
+val InfoTextColor = Color(0xFF8E8E93)  // Muted gray for info text
+val SectionLabelColor = Color(0xFF8E8E93)  // Gray for section labels like "N total"
 
 // Legacy support (keeping for any existing references)
 val Purple80 = Primary

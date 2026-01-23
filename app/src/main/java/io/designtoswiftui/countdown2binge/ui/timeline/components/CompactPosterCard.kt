@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -28,6 +30,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.AnticipatedAccent
 import io.designtoswiftui.countdown2binge.ui.theme.Background
 import io.designtoswiftui.countdown2binge.ui.theme.CardBackground
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
+import io.designtoswiftui.countdown2binge.ui.theme.EndingSoonAccent
 import io.designtoswiftui.countdown2binge.ui.theme.PremieringSoonAccent
 
 /**
@@ -56,65 +59,92 @@ fun CompactPosterCard(
     modifier: Modifier = Modifier
 ) {
     val accentColor = when (sectionStyle) {
+        TimelineSectionStyle.ENDING_SOON -> EndingSoonAccent
         TimelineSectionStyle.PREMIERING_SOON -> PremieringSoonAccent
         TimelineSectionStyle.ANTICIPATED -> AnticipatedAccent
     }
 
-    Row(
+    val totalHeight = 320.dp
+    // Calculate gap for timeline connector
+    // Adjust gap to have consistent visual padding from text to line
+    val countdownHeight = when (sectionStyle) {
+        TimelineSectionStyle.ANTICIPATED -> 40.dp  // Smaller for TBD text
+        else -> 55.dp  // Larger for number text (36sp + 9sp label)
+    }
+    val gapPadding = 8.dp  // Increased padding for better visual balance
+    val gapStart = (totalHeight - countdownHeight) / 2 - gapPadding
+    val gapEnd = (totalHeight + countdownHeight) / 2 + gapPadding
+
+    Box(
         modifier = modifier
-            .height(320.dp)
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxWidth()
+            .height(totalHeight)
     ) {
-        // Countdown zone (80dp wide, centered)
-        Box(
-            modifier = Modifier
-                .width(80.dp)
-                .height(310.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CompactCountdownDisplay(
-                style = countdownStyle,
-                accentColor = accentColor
-            )
-        }
+        // Timeline connector line with gap around countdown
+        TimelineConnector(
+            color = accentColor.copy(alpha = 0.8f),
+            gapStart = gapStart,
+            gapEnd = gapEnd
+        )
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Portrait poster
-        Box(
+        // Card content
+        Row(
             modifier = Modifier
-                .width(230.dp)
-                .height(310.dp)
-                .padding(end = 24.dp)
-                .clip(RoundedCornerShape(15.dp))
-                .background(CardBackground)
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(15.dp)
-                )
+                .fillMaxWidth()
+                .height(totalHeight)
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Poster image
-            if (posterUrl != null) {
-                AsyncImage(
-                    model = posterUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            // Countdown zone (80dp wide, centered)
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(310.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CompactCountdownDisplay(
+                    style = countdownStyle,
+                    accentColor = accentColor
                 )
             }
 
-            // Large season badge (bottom-right)
-            Text(
-                text = "S$seasonNumber",
-                fontSize = 56.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Portrait poster
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 12.dp)
-            )
+                    .width(230.dp)
+                    .height(310.dp)
+                    .padding(end = 24.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(CardBackground)
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(15.dp)
+                    )
+            ) {
+                // Poster image
+                if (posterUrl != null) {
+                    AsyncImage(
+                        model = posterUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // Large season badge (bottom-right)
+                Text(
+                    text = "S$seasonNumber",
+                    fontSize = 56.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 12.dp)
+                )
+            }
         }
     }
 }

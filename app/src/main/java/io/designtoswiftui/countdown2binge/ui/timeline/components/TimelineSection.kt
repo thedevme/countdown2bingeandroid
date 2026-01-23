@@ -6,20 +6,13 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.unit.dp
-import io.designtoswiftui.countdown2binge.ui.theme.AnticipatedAccent
-import io.designtoswiftui.countdown2binge.ui.theme.PremieringSoonAccent
 
 /**
  * Data class for a timeline entry (show with upcoming season).
@@ -37,10 +30,11 @@ data class TimelineEntry(
  *
  * Features:
  * - Section header with rotating chevron
- * - Dashed connector line (80pt zone, centered at x=40)
- * - Expanded mode: landscape backdrop cards (TimelineShowCard)
- * - Collapsed mode: portrait poster cards (CompactPosterCard)
+ * - Dashed connector line with gaps around countdown areas
+ * - Expanded mode (default): portrait poster cards (CompactPosterCard)
+ * - Collapsed mode: landscape backdrop cards (TimelineShowCard)
  * - Max 3 cards displayed
+ * - Empty cards shown when showEmptyCards is true
  *
  * @param title Section title
  * @param entries List of timeline entries
@@ -48,6 +42,7 @@ data class TimelineEntry(
  * @param isExpanded Whether the section is expanded
  * @param onToggle Called when header is tapped
  * @param onEntryClick Called when a card is tapped
+ * @param showEmptyCards Whether to show empty placeholder cards
  */
 @Composable
 fun TimelineSection(
@@ -57,15 +52,12 @@ fun TimelineSection(
     isExpanded: Boolean,
     onToggle: () -> Unit,
     onEntryClick: (Long) -> Unit,
+    showEmptyCards: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val maxCardsPerSection = 3
     val displayEntries = entries.take(maxCardsPerSection)
-
-    val accentColor = when (style) {
-        TimelineSectionStyle.PREMIERING_SOON -> PremieringSoonAccent
-        TimelineSectionStyle.ANTICIPATED -> AnticipatedAccent
-    }
+    val emptyCardsCount = if (showEmptyCards) maxCardsPerSection - displayEntries.size else 0
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Section header
@@ -77,80 +69,66 @@ fun TimelineSection(
             onToggle = onToggle
         )
 
-        // Cards with dashed connector line
-        Box {
-            // Dashed connector line
-            if (displayEntries.isNotEmpty()) {
-                Canvas(
-                    modifier = Modifier
-                        .width(80.dp)
-                        .matchParentSize()
-                ) {
-                    val dashLength = 4.dp.toPx()
-                    val gapLength = 4.dp.toPx()
-                    val pathEffect = PathEffect.dashPathEffect(
-                        floatArrayOf(dashLength, gapLength),
-                        0f
-                    )
-
-                    // Line starts below header badge (48dp) and extends to bottom
-                    val startY = 0f
-                    val endY = size.height
-                    val xPosition = 40.dp.toPx() // Centered in 80dp zone
-
-                    drawLine(
-                        color = accentColor.copy(alpha = 0.8f),
-                        start = Offset(xPosition, startY),
-                        end = Offset(xPosition, endY),
-                        strokeWidth = 2.dp.toPx(),
-                        pathEffect = pathEffect
-                    )
-                }
-            }
-
-            // Cards content
+        // Cards content (each card draws its own connector line with gaps)
+        // Expanded mode (default): portrait poster cards
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+            exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
+        ) {
             Column {
-                // Expanded mode: landscape backdrop cards
-                AnimatedVisibility(
-                    visible = isExpanded,
-                    enter = fadeIn(tween(300)) + expandVertically(tween(300)),
-                    exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
-                ) {
-                    Column {
-                        displayEntries.forEachIndexed { index, entry ->
-                            TimelineShowCard(
-                                countdownStyle = entry.countdownStyle,
-                                backdropUrl = entry.backdropUrl,
-                                seasonNumber = entry.seasonNumber,
-                                sectionStyle = style,
-                                onClick = { onEntryClick(entry.showId) }
-                            )
-                            if (index < displayEntries.lastIndex) {
-                                Spacer(modifier = Modifier.height(30.dp))
-                            }
-                        }
+                displayEntries.forEachIndexed { index, entry ->
+                    CompactPosterCard(
+                        countdownStyle = entry.countdownStyle,
+                        posterUrl = entry.posterUrl,
+                        seasonNumber = entry.seasonNumber,
+                        sectionStyle = style,
+                        onClick = { onEntryClick(entry.showId) }
+                    )
+                    if (index < displayEntries.lastIndex || emptyCardsCount > 0) {
+                        Spacer(modifier = Modifier.height(30.dp))
                     }
                 }
+                // Empty cards for expanded mode (portrait/taller)
+                repeat(emptyCardsCount) { index ->
+                    TimelineEmptyCard(
+                        isExpanded = false,
+                        sectionStyle = style
+                    )
+                    if (index < emptyCardsCount - 1) {
+                        Spacer(modifier = Modifier.height(30.dp))
+                    }
+                }
+            }
+        }
 
-                // Collapsed mode: portrait poster cards
-                AnimatedVisibility(
-                    visible = !isExpanded,
-                    enter = fadeIn(tween(300)) + expandVertically(tween(300)),
-                    exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
-                ) {
-                    Column {
-                        displayEntries.forEachIndexed { index, entry ->
-                            CompactPosterCard(
-                                countdownStyle = entry.countdownStyle,
-                                posterUrl = entry.posterUrl,
-                                seasonNumber = entry.seasonNumber,
-                                sectionStyle = style,
-                                onClick = { onEntryClick(entry.showId) }
-                            )
-                            if (index < displayEntries.lastIndex) {
-                                Spacer(modifier = Modifier.height(30.dp))
-                            }
-                        }
+        // Collapsed mode: landscape backdrop cards
+        AnimatedVisibility(
+            visible = !isExpanded,
+            enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+            exit = fadeOut(tween(300)) + shrinkVertically(tween(300))
+        ) {
+            Column {
+                displayEntries.forEachIndexed { index, entry ->
+                    TimelineShowCard(
+                        countdownStyle = entry.countdownStyle,
+                        backdropUrl = entry.backdropUrl,
+                        seasonNumber = entry.seasonNumber,
+                        sectionStyle = style,
+                        onClick = { onEntryClick(entry.showId) }
+                    )
+                    if (index < displayEntries.lastIndex || emptyCardsCount > 0) {
+                        Spacer(modifier = Modifier.height(30.dp))
+                    }
+                }
+                // Empty cards for collapsed mode (landscape/shorter)
+                repeat(emptyCardsCount) { index ->
+                    TimelineEmptyCard(
+                        isExpanded = true,
+                        sectionStyle = style
+                    )
+                    if (index < emptyCardsCount - 1) {
+                        Spacer(modifier = Modifier.height(30.dp))
                     }
                 }
             }

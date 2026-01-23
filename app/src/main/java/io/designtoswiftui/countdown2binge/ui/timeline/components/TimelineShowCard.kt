@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -28,6 +29,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.AnticipatedAccent
 import io.designtoswiftui.countdown2binge.ui.theme.Background
 import io.designtoswiftui.countdown2binge.ui.theme.CardBackground
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
+import io.designtoswiftui.countdown2binge.ui.theme.EndingSoonAccent
 import io.designtoswiftui.countdown2binge.ui.theme.PremieringSoonAccent
 
 /**
@@ -68,64 +70,90 @@ fun TimelineShowCard(
     modifier: Modifier = Modifier
 ) {
     val accentColor = when (sectionStyle) {
+        TimelineSectionStyle.ENDING_SOON -> EndingSoonAccent
         TimelineSectionStyle.PREMIERING_SOON -> PremieringSoonAccent
         TimelineSectionStyle.ANTICIPATED -> AnticipatedAccent
     }
 
-    Row(
+    val totalHeight = 190.dp
+    // Calculate gap for timeline connector
+    // Adjust gap to have consistent visual padding from text to line
+    val countdownHeight = when (sectionStyle) {
+        TimelineSectionStyle.ANTICIPATED -> 40.dp  // Smaller for TBD text
+        else -> 55.dp  // Larger for number text (36sp + 9sp label)
+    }
+    val gapPadding = 8.dp  // Increased padding for better visual balance
+    val gapStart = (totalHeight - countdownHeight) / 2 - gapPadding
+    val gapEnd = (totalHeight + countdownHeight) / 2 + gapPadding
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(190.dp)
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically
+            .height(totalHeight)
     ) {
-        // Countdown zone (80dp wide, centered)
-        Box(
-            modifier = Modifier
-                .width(80.dp)
-                .height(175.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            CountdownDisplay(
-                style = countdownStyle,
-                accentColor = accentColor
-            )
-        }
+        // Timeline connector line with gap around countdown
+        TimelineConnector(
+            color = accentColor.copy(alpha = 0.8f),
+            gapStart = gapStart,
+            gapEnd = gapEnd
+        )
 
-        // Backdrop image zone
-        Box(
+        // Card content
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(175.dp)
-                .padding(end = 24.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(CardBackground)
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(24.dp)
-                )
+                .fillMaxWidth()
+                .height(totalHeight)
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Backdrop image
-            if (backdropUrl != null) {
-                AsyncImage(
-                    model = backdropUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+            // Countdown zone (80dp wide, centered)
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(175.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CountdownDisplay(
+                    style = countdownStyle,
+                    accentColor = accentColor
                 )
             }
 
-            // Season badge (bottom-right)
-            Text(
-                text = "S$seasonNumber",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
+            // Backdrop image zone
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 12.dp)
-            )
+                    .weight(1f)
+                    .height(175.dp)
+                    .padding(end = 24.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(CardBackground)
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+            ) {
+                // Backdrop image
+                if (backdropUrl != null) {
+                    AsyncImage(
+                        model = backdropUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // Season badge (bottom-right)
+                Text(
+                    text = "S$seasonNumber",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 12.dp)
+                )
+            }
         }
     }
 }

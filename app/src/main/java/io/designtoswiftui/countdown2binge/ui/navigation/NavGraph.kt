@@ -14,6 +14,7 @@ import io.designtoswiftui.countdown2binge.ui.search.SearchScreen
 import io.designtoswiftui.countdown2binge.ui.settings.SettingsScreen
 import io.designtoswiftui.countdown2binge.ui.showdetail.EpisodeListScreen
 import io.designtoswiftui.countdown2binge.ui.showdetail.ShowDetailScreen
+import io.designtoswiftui.countdown2binge.ui.timeline.FullTimelineScreen
 import io.designtoswiftui.countdown2binge.ui.timeline.TimelineScreen
 import io.designtoswiftui.countdown2binge.ui.youtube.YouTubePlayerScreen
 import java.net.URLDecoder
@@ -24,6 +25,7 @@ import java.net.URLEncoder
  */
 sealed class Screen(val route: String) {
     data object Timeline : Screen("timeline")
+    data object FullTimeline : Screen("full_timeline")
     data object BingeReady : Screen("binge_ready")
     data object Search : Screen("search")
     data object Settings : Screen("settings")
@@ -77,6 +79,21 @@ fun NavGraph(
         // Timeline screen
         composable(Screen.Timeline.route) {
             TimelineScreen(
+                onShowClick = { showId ->
+                    navController.navigate(Screen.ShowDetail.createRoute(showId))
+                },
+                onViewFullTimelineClick = {
+                    navController.navigate(Screen.FullTimeline.route)
+                }
+            )
+        }
+
+        // Full Timeline screen
+        composable(Screen.FullTimeline.route) {
+            FullTimelineScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onShowClick = { showId ->
                     navController.navigate(Screen.ShowDetail.createRoute(showId))
                 }
