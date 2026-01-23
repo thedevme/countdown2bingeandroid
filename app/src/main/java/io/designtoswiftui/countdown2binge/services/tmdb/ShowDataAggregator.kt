@@ -1,7 +1,11 @@
 package io.designtoswiftui.countdown2binge.services.tmdb
 
+import android.util.Log
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "ShowDataAggregator"
 
 /**
  * Aggregates data from multiple TMDB API calls into a complete show dataset.
@@ -55,28 +59,90 @@ class ShowDataAggregator @Inject constructor(
 
     /**
      * Fetches details for all seasons of a show (excluding specials).
+     * Uses SEQUENTIAL fetching for reliability - large shows like SVU (26 seasons)
+     * can cause rate limiting or timeouts with parallel requests.
+     * Falls back to summary data if a season fetch fails.
      */
     suspend fun fetchAllSeasons(showId: Int): Result<List<TMDBSeasonDetails>> {
         val showResult = tmdbService.getShowDetails(showId)
         if (showResult.isFailure) {
+            Log.e(TAG, "Failed to get show details for showId=$showId")
             return Result.failure(showResult.exceptionOrNull()!!)
         }
 
         val showDetails = showResult.getOrThrow()
-        val seasonNumbers = showDetails.seasons
+        val regularSeasons = showDetails.seasons
             ?.filter { it.seasonNumber > 0 }
-            ?.map { it.seasonNumber }
+            ?.sortedBy { it.seasonNumber }
             ?: return Result.success(emptyList())
 
-        val seasonDetails = mutableListOf<TMDBSeasonDetails>()
-        for (seasonNumber in seasonNumbers) {
-            val result = tmdbService.getSeasonDetails(showId, seasonNumber)
-            if (result.isSuccess) {
-                seasonDetails.add(result.getOrThrow())
+        Log.d(TAG, "Fetching ${regularSeasons.size} seasons SEQUENTIALLY for '${showDetails.name}'")
+
+        // Fetch all seasons SEQUENTIALLY with delay to avoid rate limiting
+        // TMDB allows ~40 requests per 10 seconds
+        val seasons = mutableListOf<TMDBSeasonDetails>()
+        var successCount = 0
+        var fallbackCount = 0
+
+        for ((index, seasonSummary) in regularSeasons.withIndex()) {
+            // Add delay between requests to avoid rate limiting (skip first)
+            if (index > 0) {
+                delay(150) // 150ms between requests = ~6.6 requests/second
             }
-            // Continue even if individual season fetch fails
+
+            // Try up to 3 times per season with increasing delays
+            var seasonResult: Result<TMDBSeasonDetails>? = null
+            for (attempt in 1..3) {
+                seasonResult = tmdbService.getSeasonDetails(showId, seasonSummary.seasonNumber)
+
+                if (seasonResult.isSuccess) {
+                    break
+                }
+
+                // Check if rate limited (429)
+                val error = seasonResult.exceptionOrNull()
+                val isRateLimited = error?.message?.contains("rate", ignoreCase = true) == true ||
+                                   error?.message?.contains("429") == true
+
+                if (isRateLimited) {
+                    Log.w(TAG, "Rate limited on S${seasonSummary.seasonNumber}, waiting ${attempt * 2} seconds...")
+                    delay(attempt * 2000L) // 2s, 4s, 6s
+                } else if (attempt < 3) {
+                    Log.w(TAG, "Retry $attempt for S${seasonSummary.seasonNumber}")
+                    delay(300L * attempt)
+                }
+            }
+
+            if (seasonResult?.isSuccess == true) {
+                seasons.add(seasonResult.getOrThrow())
+                successCount++
+                Log.d(TAG, "Fetched S${seasonSummary.seasonNumber} (${successCount}/${regularSeasons.size})")
+            } else {
+                // Fallback to summary data (like iOS)
+                Log.e(TAG, "Failed S${seasonSummary.seasonNumber} after 3 attempts: ${seasonResult?.exceptionOrNull()?.message}")
+                seasons.add(createSeasonFromSummary(seasonSummary))
+                fallbackCount++
+            }
         }
 
-        return Result.success(seasonDetails)
+        Log.d(TAG, "Completed: ${seasons.size} seasons (${successCount} fetched, ${fallbackCount} fallback)")
+
+        return Result.success(seasons)
+    }
+
+    /**
+     * Creates a TMDBSeasonDetails from a season summary when the full fetch fails.
+     * This provides fallback data without episode details.
+     */
+    private fun createSeasonFromSummary(summary: TMDBSeasonSummary): TMDBSeasonDetails {
+        return TMDBSeasonDetails(
+            id = summary.id,
+            name = summary.name ?: "Season ${summary.seasonNumber}",
+            overview = summary.overview ?: "",
+            seasonNumber = summary.seasonNumber,
+            airDate = summary.airDate,
+            posterPath = summary.posterPath,
+            episodes = emptyList() // No episodes available from summary
+        )
     }
 }

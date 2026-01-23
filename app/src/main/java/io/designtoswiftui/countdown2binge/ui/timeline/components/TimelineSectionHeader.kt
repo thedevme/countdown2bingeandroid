@@ -56,6 +56,7 @@ enum class TimelineSectionStyle {
  * @param style Section style determines accent color
  * @param isExpanded Whether the section is expanded
  * @param onToggle Called when header is tapped to toggle expand/collapse
+ * @param hideChevron If true, always hide the chevron (for full timeline where nav bar controls layout)
  */
 @Composable
 fun TimelineSectionHeader(
@@ -64,6 +65,8 @@ fun TimelineSectionHeader(
     style: TimelineSectionStyle = TimelineSectionStyle.PREMIERING_SOON,
     isExpanded: Boolean = true,
     onToggle: () -> Unit = {},
+    isFirstSection: Boolean = false,
+    hideChevron: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val accentColor = when (style) {
@@ -72,8 +75,8 @@ fun TimelineSectionHeader(
         TimelineSectionStyle.ANTICIPATED -> AnticipatedAccent
     }
 
-    // Only show chevron for Premiering Soon section
-    val showChevron = style == TimelineSectionStyle.PREMIERING_SOON
+    // Only show chevron for Premiering Soon section (unless hideChevron is true)
+    val showChevron = !hideChevron && style == TimelineSectionStyle.PREMIERING_SOON
 
     // Chevron rotation: 0° when expanded (points down), -90° when collapsed (points right)
     val chevronRotation by animateFloatAsState(
@@ -90,8 +93,8 @@ fun TimelineSectionHeader(
     val gapStart = (totalHeight - badgeSize) / 2 - gapPadding
     val gapEnd = (totalHeight + badgeSize) / 2 + gapPadding
 
-    // Hide top line for Ending Soon (first section)
-    val showTopLine = style != TimelineSectionStyle.ENDING_SOON
+    // Hide top line for first section
+    val showTopLine = !isFirstSection
 
     Box(
         modifier = modifier

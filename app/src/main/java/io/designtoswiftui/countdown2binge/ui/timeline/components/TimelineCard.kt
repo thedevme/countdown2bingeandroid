@@ -3,6 +3,8 @@ package io.designtoswiftui.countdown2binge.ui.timeline.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -175,7 +177,11 @@ fun TimelineCard(
                 .padding(start = 8.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(CardBackground)
-                .clickable(onClick = onClick)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                )
         ) {
             // Backdrop image
             if (backdropUrl != null) {

@@ -1,14 +1,17 @@
 package io.designtoswiftui.countdown2binge.ui.shared
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,12 +35,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import io.designtoswiftui.countdown2binge.R
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBSearchResult
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
 import io.designtoswiftui.countdown2binge.models.GenreMapping
@@ -71,22 +77,52 @@ fun PortraitShowCard(
 
     Column(
         modifier = modifier
+            .height(320.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(CardBackground)
-            .clickable { onCardClick() }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onCardClick() }
     ) {
-        // Poster with network badge
+        // Poster with network badge - fills remaining space after info section
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .weight(1f)
+                .background(Color(0xFF1A1A1C)),
+            contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = TMDBService.IMAGE_BASE_URL + TMDBService.POSTER_SIZE + show.posterPath,
-                contentDescription = show.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            if (show.posterPath != null) {
+                AsyncImage(
+                    model = TMDBService.IMAGE_BASE_URL + TMDBService.POSTER_SIZE + show.posterPath,
+                    contentDescription = show.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                // Show logo and show name when no poster
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.app_icon_wht),
+                        contentDescription = null,
+                        modifier = Modifier.size(60.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = show.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             // Network badge (top-right)
             NetworkBadge(
@@ -176,7 +212,11 @@ private fun PortraitFollowButton(
             .height(40.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
-            .clickable(enabled = !isLoading) { onClick() }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = !isLoading
+            ) { onClick() }
             .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {

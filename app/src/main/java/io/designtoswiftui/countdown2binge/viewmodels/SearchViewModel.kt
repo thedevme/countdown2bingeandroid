@@ -58,6 +58,15 @@ class SearchViewModel @Inject constructor(
     private val _addingShows = MutableStateFlow<Set<Int>>(emptySet())
     val addingShows: StateFlow<Set<Int>> = _addingShows.asStateFlow()
 
+    // Brief loading state for quick add (minimal blocking)
+    // With background fetching, this is now very fast
+    private val _isAddingShowGlobal = MutableStateFlow(false)
+    val isAddingShowGlobal: StateFlow<Boolean> = _isAddingShowGlobal.asStateFlow()
+
+    // Name of show currently being added (for brief loading indicator)
+    private val _addingShowName = MutableStateFlow<String?>(null)
+    val addingShowName: StateFlow<String?> = _addingShowName.asStateFlow()
+
     // Set of TMDB IDs that are already followed
     private val _followedShows = MutableStateFlow<Set<Int>>(emptySet())
     val followedShows: StateFlow<Set<Int>> = _followedShows.asStateFlow()
@@ -193,15 +202,20 @@ class SearchViewModel @Inject constructor(
     /**
      * Add a show to the followed list.
      * Returns true if successful.
+     * Shows with many seasons (SVU, Grey's) can take a while - blocks all UI.
      */
-    suspend fun addShow(tmdbId: Int): Boolean {
-        // Mark as adding
+    suspend fun addShow(tmdbId: Int, showName: String? = null): Boolean {
+        // Block all interactions while adding
+        _isAddingShowGlobal.value = true
+        _addingShowName.value = showName ?: "show"
         _addingShows.update { it + tmdbId }
 
         val result = addShowUseCase.execute(tmdbId)
 
-        // Remove from adding
+        // Remove from adding and unblock
         _addingShows.update { it - tmdbId }
+        _isAddingShowGlobal.value = false
+        _addingShowName.value = null
 
         return result.fold(
             onSuccess = { show ->
@@ -221,9 +235,12 @@ class SearchViewModel @Inject constructor(
     /**
      * Add a show (fire-and-forget version for UI).
      */
-    fun addShowAsync(tmdbId: Int) {
+    fun addShowAsync(tmdbId: Int, showName: String? = null) {
+        // Don't allow adding if already adding another show
+        if (_isAddingShowGlobal.value) return
+
         viewModelScope.launch {
-            addShow(tmdbId)
+            addShow(tmdbId, showName)
         }
     }
 
@@ -415,11 +432,11 @@ class SearchViewModel @Inject constructor(
     /**
      * Toggle follow status for a show.
      */
-    fun toggleFollow(tmdbId: Int) {
+    fun toggleFollow(tmdbId: Int, showName: String? = null) {
         if (isFollowed(tmdbId)) {
             removeShow(tmdbId)
         } else {
-            addShowAsync(tmdbId)
+            addShowAsync(tmdbId, showName)
         }
     }
 

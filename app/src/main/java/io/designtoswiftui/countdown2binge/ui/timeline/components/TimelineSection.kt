@@ -53,6 +53,7 @@ fun TimelineSection(
     onToggle: () -> Unit,
     onEntryClick: (Long) -> Unit,
     showEmptyCards: Boolean = false,
+    isFirstSection: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val maxCardsPerSection = 3
@@ -66,7 +67,8 @@ fun TimelineSection(
             count = entries.size, // Show total count, not just displayed
             style = style,
             isExpanded = isExpanded,
-            onToggle = onToggle
+            onToggle = onToggle,
+            isFirstSection = isFirstSection
         )
 
         // Cards content (each card draws its own connector line with gaps)

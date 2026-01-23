@@ -68,6 +68,21 @@ class TimelineViewModel @Inject constructor(
 
     init {
         loadShows()
+        // Automatically refresh from network on launch - the app handles this so users never have to
+        refreshFromNetworkSilently()
+    }
+
+    /**
+     * Refresh from network in the background without showing refresh indicator.
+     * Called automatically on app launch to ensure data is always fresh.
+     */
+    private fun refreshFromNetworkSilently() {
+        viewModelScope.launch {
+            // Don't show refresh indicator for automatic refresh
+            refreshService.refreshAllShows()
+            // Reload local data after network refresh
+            loadShows()
+        }
     }
 
     /**

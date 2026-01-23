@@ -97,6 +97,10 @@ fun SearchScreen(
     val isTrendingLoading by viewModel.isTrendingLoading.collectAsState()
     val isAiringLoading by viewModel.isAiringLoading.collectAsState()
 
+    // Global loading state for adding shows (blocks all interactions)
+    val isAddingShowGlobal by viewModel.isAddingShowGlobal.collectAsState()
+    val addingShowName by viewModel.addingShowName.collectAsState()
+
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
 
@@ -165,7 +169,7 @@ fun SearchScreen(
                             showIdMap = showIdMap,
                             onCategoryClick = onCategoryClick,
                             onShowClick = onShowClick,
-                            onFollowClick = viewModel::toggleFollow
+                            onFollowClick = { tmdbId, name -> viewModel.toggleFollow(tmdbId, name) }
                         )
                     }
                     searchResults.isEmpty() && searchQuery.length >= 2 -> {
@@ -180,7 +184,7 @@ fun SearchScreen(
                             addingShows = addingShows,
                             showIdMap = showIdMap,
                             onShowClick = onShowClick,
-                            onAddClick = viewModel::addShowAsync
+                            onAddClick = { tmdbId, name -> viewModel.addShowAsync(tmdbId, name) }
                         )
                     }
                 }
@@ -196,6 +200,48 @@ fun SearchScreen(
                     )
                 }
             }
+        }
+
+        // Global loading overlay when adding a show (blocks all interactions)
+        if (isAddingShowGlobal) {
+            AddingShowOverlay(showName = addingShowName)
+        }
+    }
+}
+
+/**
+ * Full-screen loading overlay shown while adding a show.
+ * Blocks all user interactions until complete.
+ */
+@Composable
+private fun AddingShowOverlay(showName: String?) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f))
+            .clickable(enabled = false) { }, // Block clicks
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                color = Primary,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Adding ${showName ?: "show"}...",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = "Fetching all seasons",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 12.sp
+            )
         }
     }
 }
@@ -294,7 +340,7 @@ private fun LandingContent(
     showIdMap: Map<Int, Long>,
     onCategoryClick: (ShowCategory) -> Unit,
     onShowClick: (Int) -> Unit,  // Now uses tmdbId
-    onFollowClick: (Int) -> Unit
+    onFollowClick: (Int, String?) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -379,7 +425,7 @@ private fun LandingContent(
                     show = show,
                     isFollowed = isFollowed,
                     isLoading = addingShows.contains(show.tmdbId),
-                    onFollowClick = { onFollowClick(show.tmdbId) },
+                    onFollowClick = { onFollowClick(show.tmdbId, show.name) },
                     onCardClick = { onShowClick(show.tmdbId) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
@@ -398,7 +444,7 @@ private fun TrendingShowsGrid(
     addingShows: Set<Int>,
     showIdMap: Map<Int, Long>,
     onShowClick: (Int) -> Unit,  // Now uses tmdbId
-    onFollowClick: (Int) -> Unit
+    onFollowClick: (Int, String?) -> Unit
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -415,7 +461,7 @@ private fun TrendingShowsGrid(
                     show = show,
                     isFollowed = isFollowed,
                     isLoading = addingShows.contains(show.tmdbId),
-                    onFollowClick = { onFollowClick(show.tmdbId) },
+                    onFollowClick = { onFollowClick(show.tmdbId, show.name) },
                     onCardClick = { onShowClick(show.tmdbId) },
                     modifier = Modifier.weight(1f)
                 )
@@ -438,7 +484,7 @@ private fun TrendingShowsGrid(
                         show = show,
                         isFollowed = isFollowed,
                         isLoading = addingShows.contains(show.tmdbId),
-                        onFollowClick = { onFollowClick(show.tmdbId) },
+                        onFollowClick = { onFollowClick(show.tmdbId, show.name) },
                         onCardClick = { onShowClick(show.tmdbId) },
                         modifier = Modifier.weight(1f)
                     )
@@ -459,7 +505,7 @@ private fun SearchResultsList(
     addingShows: Set<Int>,
     showIdMap: Map<Int, Long>,
     onShowClick: (Int) -> Unit,
-    onAddClick: (Int) -> Unit
+    onAddClick: (Int, String?) -> Unit
 ) {
     // Group results into pairs for 2-column grid
     val rows = results.chunked(2)
@@ -483,7 +529,7 @@ private fun SearchResultsList(
                         show = result,
                         isFollowed = isFollowed,
                         isLoading = addingShows.contains(result.id),
-                        onFollowClick = { onAddClick(result.id) },
+                        onFollowClick = { onAddClick(result.id, result.name) },
                         onCardClick = { onShowClick(result.id) },
                         modifier = Modifier.weight(1f)
                     )

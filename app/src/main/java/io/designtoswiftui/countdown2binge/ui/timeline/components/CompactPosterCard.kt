@@ -3,6 +3,8 @@ package io.designtoswiftui.countdown2binge.ui.timeline.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,12 +68,12 @@ fun CompactPosterCard(
 
     val totalHeight = 320.dp
     // Calculate gap for timeline connector
-    // Adjust gap to have consistent visual padding from text to line
+    // Gap should break around countdown text with proper padding
     val countdownHeight = when (sectionStyle) {
-        TimelineSectionStyle.ANTICIPATED -> 40.dp  // Smaller for TBD text
-        else -> 55.dp  // Larger for number text (36sp + 9sp label)
+        TimelineSectionStyle.ANTICIPATED -> 50.dp  // TBD (24sp) + DATE (9sp) + spacing
+        else -> 60.dp  // Number (36sp) + label (9sp) + spacing
     }
-    val gapPadding = 8.dp  // Increased padding for better visual balance
+    val gapPadding = 12.dp  // Padding from text to line ends
     val gapStart = (totalHeight - countdownHeight) / 2 - gapPadding
     val gapEnd = (totalHeight + countdownHeight) / 2 + gapPadding
 
@@ -92,7 +94,11 @@ fun CompactPosterCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(totalHeight)
-                .clickable(onClick = onClick),
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Countdown zone (80dp wide, centered)
@@ -165,17 +171,19 @@ private fun CompactCountdownDisplay(
         when (style) {
             is TimelineCountdownStyle.Days -> {
                 Text(
-                    text = style.count.toString(),
+                    text = String.format("%02d", style.count),
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White
+                    color = Color.White,
+                    lineHeight = 36.sp
                 )
                 Text(
                     text = "DAYS",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White.copy(alpha = 0.7f),
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
             is TimelineCountdownStyle.Year -> {
@@ -183,29 +191,33 @@ private fun CompactCountdownDisplay(
                     text = style.year.toString(),
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Black,
-                    color = accentColor
+                    color = accentColor,
+                    lineHeight = 36.sp
                 )
                 Text(
                     text = "EXP.",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = accentColor.copy(alpha = 0.7f),
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
             is TimelineCountdownStyle.TBD -> {
                 Text(
                     text = "TBD",
-                    fontSize = 24.sp, // 36 * 0.67 ≈ 24
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
-                    color = accentColor
+                    color = accentColor,
+                    lineHeight = 24.sp
                 )
                 Text(
                     text = "DATE",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = accentColor.copy(alpha = 0.7f),
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }

@@ -26,6 +26,7 @@ class SettingsRepository @Inject constructor(
     private object PreferencesKeys {
         val INCLUDE_AIRING = booleanPreferencesKey("include_airing")
         val COUNTDOWN_DISPLAY_MODE = stringPreferencesKey("countdown_display_mode")
+        val TIMELINE_SECTIONS_EXPANDED = booleanPreferencesKey("timeline_expanded_v2")
     }
 
     /**
@@ -58,6 +59,15 @@ class SettingsRepository @Inject constructor(
         }
 
     /**
+     * Whether timeline sections are expanded.
+     * Default: true (expanded, matching iOS).
+     */
+    val timelineSectionsExpanded: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.TIMELINE_SECTIONS_EXPANDED] ?: true
+        }
+
+    /**
      * Update the include airing setting.
      */
     suspend fun setIncludeAiring(enabled: Boolean) {
@@ -72,6 +82,16 @@ class SettingsRepository @Inject constructor(
     suspend fun setCountdownDisplayMode(mode: CountdownDisplayMode) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.COUNTDOWN_DISPLAY_MODE] = mode.name
+        }
+    }
+
+    /**
+     * Toggle whether timeline sections are expanded or collapsed.
+     */
+    suspend fun toggleTimelineSectionsExpanded() {
+        context.dataStore.edit { preferences ->
+            val current = preferences[PreferencesKeys.TIMELINE_SECTIONS_EXPANDED] ?: true
+            preferences[PreferencesKeys.TIMELINE_SECTIONS_EXPANDED] = !current
         }
     }
 }

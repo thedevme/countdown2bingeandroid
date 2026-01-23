@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -36,6 +34,7 @@ import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
 import io.designtoswiftui.countdown2binge.ui.theme.Primary
 import io.designtoswiftui.countdown2binge.ui.timeline.components.CountdownLabel
 import io.designtoswiftui.countdown2binge.ui.timeline.components.DottedDivider
+import io.designtoswiftui.countdown2binge.ui.timeline.components.HeroPlaceholderCard
 import io.designtoswiftui.countdown2binge.ui.timeline.components.SlotMachineDaysPicker
 import io.designtoswiftui.countdown2binge.ui.timeline.components.StackedShowCards
 import io.designtoswiftui.countdown2binge.ui.timeline.components.StackedShowData
@@ -50,6 +49,7 @@ import io.designtoswiftui.countdown2binge.viewmodels.SettingsViewModel
 import io.designtoswiftui.countdown2binge.viewmodels.TimelineShow
 import io.designtoswiftui.countdown2binge.viewmodels.TimelineViewModel
 import java.time.LocalDateTime
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -58,7 +58,6 @@ import androidx.compose.runtime.setValue
  * Timeline screen showing shows grouped by their current state.
  * Displays: Currently Airing (stacked cards) → Premiering Soon → Anticipated
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel(),
@@ -70,9 +69,9 @@ fun TimelineScreen(
     val premieringShows by viewModel.premieringShows.collectAsState()
     val anticipatedShows by viewModel.anticipatedShows.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val isEmpty by viewModel.isEmpty.collectAsState()
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val countdownDisplayMode by settingsViewModel.countdownDisplayMode.collectAsState()
+    // Default to expanded (true)
+    var isSectionsExpanded by remember { mutableStateOf(true) }
 
     // Determine hero show (show with soonest date)
     val heroShow by remember(airingShows, premieringShows) {
@@ -128,24 +127,21 @@ fun TimelineScreen(
     ) {
         when {
             isLoading -> LoadingState()
-            isEmpty -> EmptyTimelineState()
             else -> {
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = viewModel::refreshFromNetwork,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    TimelineContent(
-                        airingShows = airingShows,
-                        premieringShows = premieringShows,
-                        anticipatedShows = anticipatedShows,
-                        heroDays = heroDays,
-                        isHeroFinale = isHeroFinale,
-                        countdownDisplayMode = countdownDisplayMode,
-                        onShowClick = onShowClick,
-                        onViewFullTimelineClick = onViewFullTimelineClick
-                    )
-                }
+                // TimelineContent handles all states including empty (shows hero placeholder + empty cards)
+                // No pull-to-refresh needed - app auto-refreshes on launch and daily in background
+                TimelineContent(
+                    airingShows = airingShows,
+                    premieringShows = premieringShows,
+                    anticipatedShows = anticipatedShows,
+                    heroDays = heroDays,
+                    isHeroFinale = isHeroFinale,
+                    countdownDisplayMode = countdownDisplayMode,
+                    isSectionsExpanded = isSectionsExpanded,
+                    onToggleSections = { isSectionsExpanded = !isSectionsExpanded },
+                    onShowClick = onShowClick,
+                    onViewFullTimelineClick = onViewFullTimelineClick
+                )
             }
         }
     }
@@ -159,14 +155,24 @@ private fun TimelineContent(
     heroDays: Int?,
     isHeroFinale: Boolean,
     countdownDisplayMode: CountdownDisplayMode,
+    isSectionsExpanded: Boolean,
+    onToggleSections: () -> Unit,
     onShowClick: (Long) -> Unit,
     onViewFullTimelineClick: () -> Unit
 ) {
     // Track which card is currently selected in the pager
     var selectedCardIndex by remember { mutableIntStateOf(0) }
 
-    // Single state controls BOTH sections (they sync together)
-    var isSectionsExpanded by remember { mutableStateOf(false) }
+    // Section visibility rules based on show counts
+    val hasAiring = airingShows.isNotEmpty()
+    val hasPremiering = premieringShows.isNotEmpty()
+    val hasTbd = anticipatedShows.isNotEmpty()
+
+    // Determine if we should show hero placeholder (no airing shows)
+    val showHeroPlaceholder = !hasAiring
+
+    // Determine if we should show empty cards in sections (onboarding state)
+    val showEmptyCardsInSections = !hasAiring && !hasPremiering && !hasTbd
 
     // Get the currently selected show's countdown data
     val selectedShow = remember(airingShows, selectedCardIndex) {
@@ -205,6 +211,7 @@ private fun TimelineContent(
     }
 
     val anticipatedEntries = remember(anticipatedShows) {
+        val currentYear = java.time.LocalDate.now().year
         anticipatedShows.map { show ->
             TimelineEntry(
                 showId = show.show.id,
@@ -216,8 +223,13 @@ private fun TimelineContent(
                 posterUrl = show.show.posterPath?.let {
                     "${TMDBService.IMAGE_BASE_URL}${TMDBService.POSTER_SIZE}$it"
                 },
+                // Only show year if it's current year or later (can't anticipate the past)
                 countdownStyle = show.season?.premiereDate?.let { date ->
-                    TimelineCountdownStyle.Year(date.year)
+                    if (date.year >= currentYear) {
+                        TimelineCountdownStyle.Year(date.year)
+                    } else {
+                        TimelineCountdownStyle.TBD
+                    }
                 } ?: TimelineCountdownStyle.TBD
             )
         }
@@ -226,8 +238,9 @@ private fun TimelineContent(
     LazyColumn(
         modifier = Modifier.fillMaxSize()
     ) {
-        // CURRENTLY AIRING SECTION (if there are airing shows)
-        if (airingShows.isNotEmpty()) {
+        // HERO SECTION
+        if (hasAiring) {
+            // CURRENTLY AIRING: Show stacked cards and countdown
             // Header: "CURRENTLY AIRING"
             item {
                 TimelineHeader(
@@ -284,52 +297,63 @@ private fun TimelineContent(
                     modifier = Modifier.padding(top = 16.dp)
                 )
             }
-        }
-
-        // PREMIERING SOON SECTION
-        if (premieringShows.isNotEmpty()) {
-            // If no airing shows, show Timeline header first
-            if (airingShows.isEmpty()) {
-                item {
-                    TimelineHeader(
-                        headerType = TimelineHeaderType.TIMELINE,
-                        lastUpdated = LocalDateTime.now()
-                    )
-                }
+        } else {
+            // NO AIRING SHOWS: Show "Timeline" header and hero placeholder (matching iOS)
+            item {
+                TimelineHeader(
+                    headerType = TimelineHeaderType.TIMELINE,
+                    lastUpdated = LocalDateTime.now()
+                )
             }
 
+            item {
+                HeroPlaceholderCard()
+            }
+
+            // Dotted divider below placeholder
+            item {
+                DottedDivider(
+                    modifier = Modifier.padding(top = 24.dp)
+                )
+            }
+        }
+
+        // SECTION VISIBILITY RULES:
+        // - 0 airing, 0 premiering, 0 TBD → Both sections with empty cards
+        // - 0 airing, 0 premiering, N TBD → TBD section only
+        // - 0 airing, N premiering, 0 TBD → Premiering section only
+        // - N airing, 0 premiering, 0 TBD → No sections (hero stack only)
+        // - N airing, N premiering, N TBD → Both sections
+
+        // PREMIERING SOON SECTION (has chevron that controls both sections)
+        val showPremieringSection = hasPremiering || showEmptyCardsInSections
+        if (showPremieringSection) {
             item {
                 TimelineSection(
                     title = "Premiering Soon",
                     entries = premieringEntries,
                     style = TimelineSectionStyle.PREMIERING_SOON,
                     isExpanded = isSectionsExpanded,
-                    onToggle = { isSectionsExpanded = !isSectionsExpanded },
-                    onEntryClick = onShowClick
+                    onToggle = onToggleSections,
+                    onEntryClick = onShowClick,
+                    showEmptyCards = showEmptyCardsInSections,
+                    isFirstSection = true
                 )
             }
         }
 
-        // ANTICIPATED SECTION
-        if (anticipatedShows.isNotEmpty()) {
-            // If no airing or premiering shows, show Timeline header first
-            if (airingShows.isEmpty() && premieringShows.isEmpty()) {
-                item {
-                    TimelineHeader(
-                        headerType = TimelineHeaderType.TIMELINE,
-                        lastUpdated = LocalDateTime.now()
-                    )
-                }
-            }
-
+        // ANTICIPATED SECTION (no chevron - follows Premiering Soon's state)
+        val showTbdSection = hasTbd || showEmptyCardsInSections
+        if (showTbdSection) {
             item {
                 TimelineSection(
                     title = "Anticipated",
                     entries = anticipatedEntries,
                     style = TimelineSectionStyle.ANTICIPATED,
                     isExpanded = isSectionsExpanded,
-                    onToggle = { isSectionsExpanded = !isSectionsExpanded },
-                    onEntryClick = onShowClick
+                    onToggle = onToggleSections,
+                    onEntryClick = onShowClick,
+                    showEmptyCards = showEmptyCardsInSections
                 )
             }
         }
@@ -358,34 +382,6 @@ private fun LoadingState() {
             color = Primary,
             strokeWidth = 3.dp
         )
-    }
-}
-
-@Composable
-private fun EmptyTimelineState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(
-                text = "Your Timeline is Empty",
-                color = OnBackgroundMuted,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Search for TV shows to start\ntracking your binge timeline",
-                color = OnBackgroundSubtle,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-        }
     }
 }
 

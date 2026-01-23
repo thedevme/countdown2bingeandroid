@@ -1,15 +1,30 @@
 package io.designtoswiftui.countdown2binge.usecases
 
+import android.util.Log
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.tmdb.ShowDataAggregator
 import io.designtoswiftui.countdown2binge.services.tmdb.ShowProcessor
+import io.designtoswiftui.countdown2binge.services.tmdb.FullShowData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "AddShowUseCase"
+
 /**
  * Use case for adding a new show to the user's followed shows.
+ *
+ * Uses a two-phase approach for better UX:
+ * 1. Quick add: Fetch show details + latest season, save, return immediately
+ * 2. Background: Fetch all remaining seasons and update the database
+ *
+ * This provides immediate feedback while large shows (SVU, Grey's Anatomy)
+ * download their 20+ seasons in the background.
  */
 @Singleton
 class AddShowUseCase @Inject constructor(
@@ -17,6 +32,8 @@ class AddShowUseCase @Inject constructor(
     private val aggregator: ShowDataAggregator,
     private val processor: ShowProcessor
 ) {
+    // Background scope for fetching remaining seasons after quick add
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Result of adding a show.
@@ -28,7 +45,9 @@ class AddShowUseCase @Inject constructor(
     }
 
     /**
-     * Execute the add show flow.
+     * Execute the add show flow using two-phase approach:
+     * 1. Quick: Save show with latest season (for correct timeline placement)
+     * 2. Background: Fetch all remaining seasons (no blocking)
      *
      * @param tmdbId The TMDB ID of the show to add
      * @return Result containing the saved show or error
@@ -44,7 +63,8 @@ class AddShowUseCase @Inject constructor(
             }
         }
 
-        // Fetch full show data from TMDB
+        // PHASE 1: Quick add with latest season only
+        // This gives us enough data for correct timeline categorization
         val fullDataResult = aggregator.fetchFullShowData(tmdbId)
         if (fullDataResult.isFailure) {
             return Result.failure(
@@ -57,65 +77,135 @@ class AddShowUseCase @Inject constructor(
 
         val fullData = fullDataResult.getOrThrow()
         val asOf = LocalDate.now()
-
-        // Process show data into local model
         val show = processor.processShow(fullData, asOf)
+        val totalSeasonCount = fullData.showDetails.seasons
+            ?.filter { it.seasonNumber > 0 }?.size ?: 0
 
-        // Process seasons - fetch ALL season details for episode data
-        val seasons = mutableListOf<io.designtoswiftui.countdown2binge.models.Season>()
-        val episodesBySeasonTmdbId = mutableMapOf<Int, List<io.designtoswiftui.countdown2binge.models.Episode>>()
+        Log.d(TAG, "Quick add: '${show.title}' has $totalSeasonCount seasons total")
 
-        // Fetch details for ALL seasons (not just the latest)
-        val allSeasonsResult = aggregator.fetchAllSeasons(tmdbId)
-        if (allSeasonsResult.isSuccess) {
-            val allSeasonDetails = allSeasonsResult.getOrThrow()
-            for (seasonDetails in allSeasonDetails) {
-                val season = processor.processSeason(seasonDetails, 0, asOf) // showId will be set during save
-                seasons.add(season)
+        // Process ONLY the latest season for quick save
+        val quickSeasons = mutableListOf<io.designtoswiftui.countdown2binge.models.Season>()
+        val quickEpisodes = mutableMapOf<Int, List<io.designtoswiftui.countdown2binge.models.Episode>>()
 
-                // Process episodes for this season
-                val episodes = processor.processEpisodes(seasonDetails, 0) // seasonId will be set during save
-                episodesBySeasonTmdbId[seasonDetails.id] = episodes
-            }
-        } else {
-            // Fallback: use the latest season details if available, and summaries for others
-            fullData.latestSeasonDetails?.let { seasonDetails ->
-                val season = processor.processSeason(seasonDetails, 0, asOf)
-                seasons.add(season)
-                val episodes = processor.processEpisodes(seasonDetails, 0)
-                episodesBySeasonTmdbId[seasonDetails.id] = episodes
-            }
-
-            // Process other seasons from summary (without episode details)
-            fullData.showDetails.seasons
-                ?.filter { summary ->
-                    summary.seasonNumber > 0 &&
-                            seasons.none { it.tmdbId == summary.id }
-                }
-                ?.forEach { summary ->
-                    val season = processor.processSeasonSummary(summary, 0, asOf)
-                    seasons.add(season)
-                }
+        fullData.latestSeasonDetails?.let { latestSeason ->
+            Log.d(TAG, "Quick add: Using latest season S${latestSeason.seasonNumber}")
+            val season = processor.processSeason(latestSeason, 0, asOf)
+            Log.d(TAG, "Quick add: S${season.seasonNumber} state=${season.state}")
+            quickSeasons.add(season)
+            val episodes = processor.processEpisodes(latestSeason, 0)
+            quickEpisodes[latestSeason.id] = episodes
         }
 
-        // Sort seasons by season number
-        val sortedSeasons = seasons.sortedBy { it.seasonNumber }
+        // Also add season summaries for other seasons (basic info, no episodes)
+        // This ensures the show appears complete even before background fetch
+        fullData.showDetails.seasons
+            ?.filter { summary ->
+                summary.seasonNumber > 0 &&
+                        quickSeasons.none { it.seasonNumber == summary.seasonNumber }
+            }
+            ?.forEach { summary ->
+                val season = processor.processSeasonSummary(summary, 0, asOf)
+                quickSeasons.add(season)
+            }
 
-        // Save everything to the repository
-        return try {
-            val showId = repository.saveShowWithSeasons(
+        val sortedQuickSeasons = quickSeasons.sortedBy { it.seasonNumber }
+
+        // Quick save to database
+        val showId = try {
+            repository.saveShowWithSeasons(
                 show = show,
-                seasons = sortedSeasons,
-                episodesBySeasonTmdbId = episodesBySeasonTmdbId
+                seasons = sortedQuickSeasons,
+                episodesBySeasonTmdbId = quickEpisodes
             )
-
-            // Retrieve the saved show with its ID
-            val savedShow = repository.getShowById(showId)
-                ?: return Result.failure(AddShowException.SaveFailed(tmdbId, null))
-
-            Result.success(savedShow)
         } catch (e: Exception) {
-            Result.failure(AddShowException.SaveFailed(tmdbId, e))
+            return Result.failure(AddShowException.SaveFailed(tmdbId, e))
+        }
+
+        val savedShow = repository.getShowById(showId)
+            ?: return Result.failure(AddShowException.SaveFailed(tmdbId, null))
+
+        Log.d(TAG, "Quick add complete: '${savedShow.title}' saved with ${sortedQuickSeasons.size} seasons")
+
+        // PHASE 2: Background fetch for full season details
+        // Only needed if there are more seasons than just the latest
+        if (totalSeasonCount > 1) {
+            Log.d(TAG, "Launching background fetch for remaining season details")
+            backgroundScope.launch {
+                fetchRemainingSeasonsInBackground(
+                    showId = showId,
+                    tmdbId = tmdbId,
+                    fullData = fullData,
+                    asOf = asOf
+                )
+            }
+        }
+
+        return Result.success(savedShow)
+    }
+
+    /**
+     * Background fetch for remaining season details.
+     * Updates existing seasons with full episode data.
+     */
+    private suspend fun fetchRemainingSeasonsInBackground(
+        showId: Long,
+        tmdbId: Int,
+        fullData: FullShowData,
+        asOf: LocalDate
+    ) {
+        try {
+            Log.d(TAG, "Background: Starting fetch for all seasons of tmdbId=$tmdbId")
+
+            val allSeasonsResult = aggregator.fetchAllSeasons(tmdbId)
+            if (allSeasonsResult.isFailure) {
+                Log.e(TAG, "Background: Failed to fetch seasons - ${allSeasonsResult.exceptionOrNull()?.message}")
+                return
+            }
+
+            val allSeasonDetails = allSeasonsResult.getOrThrow()
+            Log.d(TAG, "Background: Fetched ${allSeasonDetails.size} season details")
+
+            // Get existing seasons from database
+            val existingSeasons = repository.getSeasonsForShowSync(showId)
+
+            var updatedCount = 0
+            for (seasonDetails in allSeasonDetails) {
+                // Skip the latest season (already has full data)
+                if (seasonDetails.id == fullData.latestSeasonDetails?.id) {
+                    continue
+                }
+
+                // Find existing season by season number
+                val existingSeason = existingSeasons.find { it.seasonNumber == seasonDetails.seasonNumber }
+
+                if (existingSeason != null && seasonDetails.episodes?.isNotEmpty() == true) {
+                    // Update existing season with full episode data
+                    val processedSeason = processor.processSeason(seasonDetails, showId, asOf)
+                    val updatedSeason = existingSeason.copy(
+                        premiereDate = processedSeason.premiereDate,
+                        finaleDate = processedSeason.finaleDate,
+                        isFinaleEstimated = processedSeason.isFinaleEstimated,
+                        episodeCount = processedSeason.episodeCount,
+                        airedEpisodeCount = processedSeason.airedEpisodeCount,
+                        releasePattern = processedSeason.releasePattern,
+                        state = processedSeason.state
+                    )
+                    repository.updateSeason(updatedSeason)
+
+                    // Add episodes if we don't have them
+                    val existingEpisodes = repository.getEpisodesForSeasonSync(existingSeason.id)
+                    if (existingEpisodes.isEmpty()) {
+                        val episodes = processor.processEpisodes(seasonDetails, existingSeason.id)
+                        repository.saveEpisodes(episodes)
+                    }
+
+                    updatedCount++
+                }
+            }
+
+            Log.d(TAG, "Background: Updated $updatedCount seasons with full details")
+        } catch (e: Exception) {
+            Log.e(TAG, "Background: Error fetching seasons - ${e.message}")
         }
     }
 

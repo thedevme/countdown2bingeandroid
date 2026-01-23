@@ -1,5 +1,8 @@
 package io.designtoswiftui.countdown2binge.ui.bingeready.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -87,7 +91,8 @@ fun ShowSelector(
 }
 
 /**
- * Individual show thumbnail.
+ * Individual show thumbnail with animated selection state.
+ * iOS spec: Spring animation (response: 0.5s, damping: 0.7)
  */
 @Composable
 private fun ShowThumbnail(
@@ -96,25 +101,39 @@ private fun ShowThumbnail(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Thumbnail dimensions: 56×84 (per iOS spec)
-    val thumbnailWidth = 56.dp
-    val thumbnailHeight = 84.dp
+    // Thumbnail dimensions: 80×120 (larger for better visibility)
+    val thumbnailWidth = 80.dp
+    val thumbnailHeight = 120.dp
+
+    // Animated opacity: 0.6 (unselected) → 1.0 (selected)
+    val animatedAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.6f,
+        animationSpec = spring(
+            dampingRatio = 0.7f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "thumbnailAlpha"
+    )
+
+    // Animated border alpha: 0 (unselected) → 1 (selected)
+    val animatedBorderAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.7f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "thumbnailBorder"
+    )
 
     Box(
         modifier = modifier
             .width(thumbnailWidth)
             .height(thumbnailHeight)
-            .alpha(if (isSelected) 1f else 0.6f)
-            .then(
-                if (isSelected) {
-                    Modifier.border(
-                        width = 2.dp,
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                } else {
-                    Modifier
-                }
+            .alpha(animatedAlpha)
+            .border(
+                width = 2.dp,
+                color = Color.White.copy(alpha = animatedBorderAlpha),
+                shape = RoundedCornerShape(8.dp)
             )
             .clip(RoundedCornerShape(8.dp))
             .background(CardBackground)

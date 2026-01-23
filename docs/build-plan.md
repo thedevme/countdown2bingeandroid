@@ -1195,3 +1195,36 @@ dependencies {
 ## Design Dependencies
 
 Same designs from iOS apply—just adapt for Material 3 / Android conventions.
+
+---
+
+## Future Features / TODOs
+
+### Background Download Progress Indicator
+
+**Status:** Deferred (caused crash, needs investigation)
+
+**Description:**
+When adding shows with many seasons (e.g., Grey's Anatomy 21 seasons, SVU 26 seasons), display a progress indicator banner at the top of the screen showing:
+- "Downloading Grey's Anatomy..."
+- Handle multiple concurrent downloads: "Grey's Anatomy & SVU" or "Grey's Anatomy + 3 more"
+- Visible on ALL tabs (not just Search)
+- Animated entrance/exit
+
+**Current Behavior:**
+- Two-phase add: Quick save with latest season → Background fetch for remaining seasons
+- No UI indicator for background fetching
+
+**Implementation Notes:**
+- `AddShowUseCase` already has the two-phase background fetch logic working
+- Need to add `BackgroundDownload` data class with tracking StateFlow
+- Inject `AddShowUseCase` into `MainActivity` to observe downloads app-wide
+- Add `GlobalDownloadBanner` composable to Scaffold topBar
+- AnimatedVisibility for smooth entrance/exit
+- Handle multiple simultaneous downloads gracefully
+
+**Files to modify:**
+- `AddShowUseCase.kt` - Add tracking StateFlow
+- `MainActivity.kt` - Inject use case, add banner UI
+- Consider creating a separate `BackgroundDownloadManager` singleton for cleaner architecture
+

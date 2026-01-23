@@ -40,6 +40,17 @@ class SettingsViewModel @Inject constructor(
         )
 
     /**
+     * Whether timeline sections are expanded.
+     * Default: true (expanded).
+     */
+    val timelineSectionsExpanded: StateFlow<Boolean> = settingsRepository.timelineSectionsExpanded
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = true
+        )
+
+    /**
      * Toggle the include airing setting.
      */
     fun setIncludeAiring(enabled: Boolean) {
@@ -54,6 +65,15 @@ class SettingsViewModel @Inject constructor(
     fun setCountdownDisplayMode(mode: CountdownDisplayMode) {
         viewModelScope.launch {
             settingsRepository.setCountdownDisplayMode(mode)
+        }
+    }
+
+    /**
+     * Toggle whether timeline sections are expanded or collapsed.
+     */
+    fun toggleTimelineSectionsExpanded() {
+        viewModelScope.launch {
+            settingsRepository.toggleTimelineSectionsExpanded()
         }
     }
 }

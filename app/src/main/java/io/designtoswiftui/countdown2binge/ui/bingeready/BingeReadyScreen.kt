@@ -67,14 +67,6 @@ import io.designtoswiftui.countdown2binge.viewmodels.BingeReadySeason
 import io.designtoswiftui.countdown2binge.viewmodels.BingeReadyViewModel
 
 /**
- * Navigation direction for card drop transitions.
- */
-private enum class NavigationDirection {
-    FORWARD,  // Cards drop from top, exit to bottom
-    BACKWARD  // Cards rise from bottom, exit to top
-}
-
-/**
  * Data class to group seasons by show for the card stack.
  */
 private data class ShowWithSeasons(
@@ -124,17 +116,50 @@ fun BingeReadyScreen(
     }
 
     // State for current show and season selection
-    var selectedShowIndex by remember { mutableIntStateOf(0) }
+    var displayedShowIndex by remember { mutableIntStateOf(0) }
+    var targetShowIndex by remember { mutableIntStateOf(0) }
+    var isScrollingToShow by remember { mutableStateOf(false) }
+    var isLastStep by remember { mutableStateOf(false) }
     var currentSeasonIndex by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var navigationDirection by remember { mutableStateOf(NavigationDirection.FORWARD) }
 
-    // Reset season index when show changes
-    LaunchedEffect(selectedShowIndex) {
+    // Animate through each intermediate show when target changes
+    LaunchedEffect(targetShowIndex) {
+        if (targetShowIndex == displayedShowIndex || isScrollingToShow) return@LaunchedEffect
+
+        isScrollingToShow = true
+        val direction = if (targetShowIndex > displayedShowIndex) 1 else -1
+
+        // Calculate indices to scroll through
+        val indicesToVisit = mutableListOf<Int>()
+        var current = displayedShowIndex
+        while (current != targetShowIndex) {
+            current += direction
+            indicesToVisit.add(current)
+        }
+
+        // Animate through each show
+        for ((i, nextIndex) in indicesToVisit.withIndex()) {
+            val isFinalStep = i == indicesToVisit.lastIndex
+            isLastStep = isFinalStep
+
+            // Fast through middle (150ms), slow landing (350ms)
+            val stepDuration = if (isFinalStep) 350L else 150L
+
+            displayedShowIndex = nextIndex
+            delay(stepDuration)
+        }
+
+        isScrollingToShow = false
+        isLastStep = false
+    }
+
+    // Reset season index when displayed show changes
+    LaunchedEffect(displayedShowIndex) {
         currentSeasonIndex = 0
     }
 
-    val selectedShow = showsWithSeasons.getOrNull(selectedShowIndex)
+    val selectedShow = showsWithSeasons.getOrNull(displayedShowIndex)
 
     Box(
         modifier = Modifier
@@ -152,19 +177,14 @@ fun BingeReadyScreen(
                 ) {
                     BingeReadyContent(
                         showsWithSeasons = showsWithSeasons,
-                        selectedShowIndex = selectedShowIndex,
+                        displayedShowIndex = displayedShowIndex,
+                        targetShowIndex = targetShowIndex,
+                        isLastStep = isLastStep,
                         currentSeasonIndex = currentSeasonIndex,
-                        navigationDirection = navigationDirection,
-                        onShowSelected = { targetIndex ->
-                            if (targetIndex == selectedShowIndex) return@BingeReadyContent
-                            // Set direction FIRST (before index change)
-                            navigationDirection = if (targetIndex > selectedShowIndex) {
-                                NavigationDirection.FORWARD
-                            } else {
-                                NavigationDirection.BACKWARD
+                        onShowSelected = { newIndex ->
+                            if (newIndex != targetShowIndex && !isScrollingToShow) {
+                                targetShowIndex = newIndex
                             }
-                            // Then update index (triggers AnimatedContent)
-                            selectedShowIndex = targetIndex
                         },
                         onSeasonChanged = { currentSeasonIndex = it },
                         onMarkWatched = { season ->
@@ -184,9 +204,10 @@ fun BingeReadyScreen(
                 onConfirm = {
                     showDeleteDialog = false
                     viewModel.unfollowShow(selectedShow.showId)
-                    // Adjust selected index if needed
-                    if (selectedShowIndex >= showsWithSeasons.size - 1 && selectedShowIndex > 0) {
-                        selectedShowIndex--
+                    // Adjust indices if needed
+                    if (displayedShowIndex >= showsWithSeasons.size - 1 && displayedShowIndex > 0) {
+                        displayedShowIndex--
+                        targetShowIndex = displayedShowIndex
                     }
                 },
                 onDismiss = { showDeleteDialog = false }
@@ -198,17 +219,17 @@ fun BingeReadyScreen(
 @Composable
 private fun BingeReadyContent(
     showsWithSeasons: List<ShowWithSeasons>,
-    selectedShowIndex: Int,
+    displayedShowIndex: Int,
+    targetShowIndex: Int,
+    isLastStep: Boolean,
     currentSeasonIndex: Int,
-    navigationDirection: NavigationDirection,
     onShowSelected: (Int) -> Unit,
     onSeasonChanged: (Int) -> Unit,
     onMarkWatched: (BingeReadySeasonData) -> Unit,
     onDeleteShow: () -> Unit,
     onCardClick: (BingeReadySeasonData) -> Unit
 ) {
-
-    val selectedShow = showsWithSeasons.getOrNull(selectedShowIndex) ?: return
+    val selectedShow = showsWithSeasons.getOrNull(displayedShowIndex) ?: return
     val currentSeason = selectedShow.seasons.getOrNull(currentSeasonIndex)
 
     // State for mark watched animation - tracks seasons that have been marked
@@ -307,8 +328,29 @@ private fun BingeReadyContent(
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Calculate card size: 70% of screen width, 1.5:1 aspect ratio
-        val cardWidth = maxWidth * 0.7f
+        // Calculate fixed element heights
+        val headerHeight = 44.dp      // Header text + padding
+        val spacerAfterHeader = 24.dp
+        val titleHeight = 50.dp       // Show title in card area
+        val progressBarArea = 60.dp   // Progress bar + padding
+        val spacerBeforeThumbs = 24.dp
+        val thumbnailHeight = 120.dp  // Updated thumbnail size
+        val bottomPadding = 16.dp     // Safe area (reduced since thumbnails are larger)
+
+        val fixedHeight = headerHeight + spacerAfterHeader + titleHeight +
+                          progressBarArea + spacerBeforeThumbs + thumbnailHeight + bottomPadding
+
+        // Available height for card (with some padding)
+        val availableHeightForCard = (maxHeight - fixedHeight - 32.dp).coerceAtLeast(200.dp)
+
+        // Calculate card size to fill available space while maintaining 1.5:1 aspect ratio
+        // Card height should fit in available space, width derived from aspect ratio
+        val maxCardWidth = maxWidth * 0.75f
+        val cardHeightFromAvailable = availableHeightForCard
+        val cardWidthFromHeight = cardHeightFromAvailable / 1.5f
+
+        // Use whichever constraint is tighter
+        val cardWidth = minOf(cardWidthFromHeight, maxCardWidth)
         val cardHeight = cardWidth * 1.5f
 
         // Calculate scale factor based on screen height (similar to iOS)
@@ -323,36 +365,53 @@ private fun BingeReadyContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Card drop animation with FIXED offsets (not based on distance)
-            // Like iOS .id(currentShowIndex) - same visual transition every time
+            // AnimatedContent for view replacement transition
+            // Steps through each show with fast intermediate / slow landing
+            // iOS uses same spring for ALL steps - only delay differs
+            // This creates overlapping animations that feel smooth
+            val springStiffness = 500f  // Consistent spring, ~0.4s to settle
+
+            // Fixed offsets in dp (same as iOS)
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val enterOffsetPx = with(density) { 250.dp.roundToPx() }
+            val exitOffsetPx = with(density) { 350.dp.roundToPx() }
+
             AnimatedContent(
-                targetState = selectedShowIndex,
+                targetState = displayedShowIndex,
                 transitionSpec = {
-                    val isForward = navigationDirection == NavigationDirection.FORWARD
+                    // Determine direction inside transitionSpec
+                    val isForward = targetState > initialState
 
-                    // FIXED offset values in dp - same every time regardless of jump distance
-                    val enterOffsetDp = if (isForward) -250 else 250
-                    val exitOffsetDp = if (isForward) 350 else -350
+                    // Fixed pixel offsets based on direction
+                    val enterOffset = if (isForward) -enterOffsetPx else enterOffsetPx
+                    val exitOffset = if (isForward) exitOffsetPx else -exitOffsetPx
 
-                    val enter = slideInVertically(
-                        initialOffsetY = { enterOffsetDp * 3 },  // Fixed dp value
-                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
-                    ) + fadeIn(animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) +
-                      scaleIn(initialScale = 0.8f, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
-
-                    val exit = slideOutVertically(
-                        targetOffsetY = { exitOffsetDp * 3 },  // Fixed dp value
-                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
-                    ) + fadeOut(animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) +
-                      scaleOut(targetScale = 0.8f, animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
-
-                    (enter togetherWith exit).using(SizeTransform(clip = false))
+                    (slideInVertically(
+                        initialOffsetY = { enterOffset },
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                    ) + fadeIn(
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                    ) + scaleIn(
+                        initialScale = 0.8f,
+                        animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                    )).togetherWith(
+                        slideOutVertically(
+                            targetOffsetY = { exitOffset },
+                            animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                        ) + fadeOut(
+                            animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                        ) + scaleOut(
+                            targetScale = 0.8f,
+                            animationSpec = spring(dampingRatio = 0.8f, stiffness = springStiffness)
+                        )
+                    ).using(SizeTransform(clip = false))
                 },
-                label = "cardDropTransition",
+                label = "showTransition",
                 modifier = Modifier.weight(1f)
             ) { showIndex ->
-                val animatedShow = showsWithSeasons.getOrNull(showIndex) ?: return@AnimatedContent
-                val animatedSeasonData = animatedShow.seasons.map { bingeReadySeason ->
+                val show = showsWithSeasons.getOrNull(showIndex) ?: return@AnimatedContent
+
+                val seasonData = show.seasons.map { bingeReadySeason ->
                     BingeReadySeasonData(
                         showId = bingeReadySeason.show.id,
                         seasonId = bingeReadySeason.season.id,
@@ -370,7 +429,7 @@ private fun BingeReadyContent(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = animatedShow.showTitle.uppercase(),
+                        text = show.showTitle.uppercase(),
                         fontSize = (22 * scaleFactor).sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
@@ -385,8 +444,8 @@ private fun BingeReadyContent(
                     Spacer(modifier = Modifier.weight(1f))
 
                     BingeReadyCardStack(
-                        seasons = animatedSeasonData,
-                        currentIndex = if (showIndex == selectedShowIndex) currentSeasonIndex else 0,
+                        seasons = seasonData,
+                        currentIndex = if (showIndex == displayedShowIndex) currentSeasonIndex else 0,
                         onIndexChange = onSeasonChanged,
                         onMarkWatched = { season -> markingWatchedSeason = season },
                         onDelete = onDeleteShow,
@@ -398,7 +457,7 @@ private fun BingeReadyContent(
                 }
             }
 
-            // Episode Progress Bar (outside AnimatedContent for smoother updates)
+            // Episode Progress Bar
             if (currentSeason != null) {
                 // Determine watched count:
                 // - If marking this season watched, show full (triggers fill animation)
@@ -425,15 +484,15 @@ private fun BingeReadyContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Show Selector (Thumbnail Nav) - highlights target immediately
+            // Show Selector (Thumbnail Nav) - follows displayedShowIndex to animate through
             ShowSelector(
                 shows = showThumbnails,
-                selectedIndex = selectedShowIndex,
+                selectedIndex = displayedShowIndex,
                 onShowSelected = onShowSelected
             )
 
-            // Bottom safe area padding
-            Spacer(modifier = Modifier.height(80.dp))
+            // Bottom safe area padding (reduced since thumbnails are larger)
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

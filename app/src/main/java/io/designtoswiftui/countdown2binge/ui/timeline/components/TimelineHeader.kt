@@ -3,6 +3,7 @@
 package io.designtoswiftui.countdown2binge.ui.timeline.components
 
 import android.annotation.SuppressLint
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,8 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -58,7 +62,7 @@ fun TimelineHeader(
     val title = when (headerType) {
         TimelineHeaderType.CURRENTLY_AIRING -> "CURRENTLY AIRING"
         TimelineHeaderType.PREMIERING_SOON -> "PREMIERING SOON"
-        TimelineHeaderType.TIMELINE -> "Timeline"
+        TimelineHeaderType.TIMELINE -> "CURRENTLY AIRING"
     }
 
     val lastUpdatedText = remember(lastUpdated) {
@@ -76,11 +80,11 @@ fun TimelineHeader(
     ) {
         Text(
             text = title,
-            fontSize = if (headerType == TimelineHeaderType.TIMELINE) 24.sp else 16.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = OnBackground,
             textAlign = TextAlign.Center,
-            letterSpacing = if (headerType != TimelineHeaderType.TIMELINE) 2.sp else 0.sp
+            letterSpacing = 2.sp
         )
 
         if (lastUpdatedText.isNotEmpty()) {
@@ -157,28 +161,35 @@ fun CountdownLabel(
 }
 
 /**
- * Vertical dotted divider line (teal dots).
- * Used above and below the slot machine countdown.
+ * Vertical dashed divider line (teal).
+ * Used to connect hero section to the sections below.
  */
 @Composable
 fun DottedDivider(
+    height: Dp = 60.dp,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
     ) {
-        repeat(3) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .background(
-                        color = DividerDotColor,
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-        }
+        val dashLength = 6.dp.toPx()
+        val gapLength = 4.dp.toPx()
+        val pathEffect = PathEffect.dashPathEffect(
+            floatArrayOf(dashLength, gapLength),
+            0f
+        )
+
+        val centerX = size.width / 2
+
+        drawLine(
+            color = DividerDotColor,
+            start = Offset(centerX, 0f),
+            end = Offset(centerX, size.height),
+            strokeWidth = 2.dp.toPx(),
+            pathEffect = pathEffect
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package io.designtoswiftui.countdown2binge.ui.timeline.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,7 +82,11 @@ fun HeroCard(
                 )
                 .clip(RoundedCornerShape(28.dp))
                 .background(Color.White)
-                .clickable(onClick = onClick)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                )
         ) {
             if (imageUrl != null) {
                 AsyncImage(

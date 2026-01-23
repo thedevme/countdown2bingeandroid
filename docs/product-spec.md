@@ -26,9 +26,49 @@ users should never need to remember dates, finales, or season status.
   - Finale
   - Next episode (secondary)
 - Timeline-style home screen showing:
-  - Airing now
-  - Premiering soon
+  - Currently Airing (Ending Soon on full timeline)
+  - Premiering Soon
   - Anticipated / TBD
+
+### Timeline Categorization Logic
+
+Shows are categorized based on their **production status** and **season state**:
+
+**Currently Airing / Ending Soon**
+- Season has premiered (premiere date in past)
+- Season finale hasn't aired yet OR no finale date (TBD)
+- Show displays days until finale (or TBD if unknown)
+
+**Premiering Soon**
+- Season has a confirmed premiere date in the future
+- Show displays days until premiere
+
+**Anticipated (TBD)**
+- Show is still in production (Returning/In Production status)
+- Current season is complete (Binge Ready or Watched)
+- No premiere date announced for next season
+- Always shows "TBD" - never shows past years
+
+**Not in Timeline (Binge Ready only)**
+- Show status is Ended or Canceled
+- These shows skip the timeline entirely
+- Only appear in Binge Ready section
+
+**State Transitions:**
+1. Anticipated (TBD) → Premiering Soon: When premiere date is announced
+2. Premiering Soon → Currently Airing: When premiere date arrives
+3. Currently Airing → Binge Ready: Day after finale airs
+4. Binge Ready → Anticipated: If show is still in production (waiting for next season)
+5. Binge Ready → Removed from timeline: If show is ended/canceled
+
+### Automatic Data Refresh
+
+The app automatically keeps show data fresh - users never have to worry about outdated information:
+
+- **On Launch:** Silently refreshes all shows from TMDB in the background
+- **Daily Background:** WorkManager runs refresh every 24 hours (requires network)
+
+No manual pull-to-refresh needed on the main timeline - this is a core differentiator. The app handles data freshness automatically so users can trust the countdowns are always accurate.
 - Ability to plan binges around dates (calendar-aware later)
 - My Show Reactions:
   - Quick reactions per episode or season

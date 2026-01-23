@@ -3,6 +3,8 @@ package io.designtoswiftui.countdown2binge.ui.timeline.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,9 +30,10 @@ import androidx.compose.ui.unit.sp
 import io.designtoswiftui.countdown2binge.ui.theme.AppTypography
 import io.designtoswiftui.countdown2binge.ui.theme.Background
 import io.designtoswiftui.countdown2binge.ui.theme.Countdown2BingeTheme
+import io.designtoswiftui.countdown2binge.ui.theme.FooterButtonBackground
+import io.designtoswiftui.countdown2binge.ui.theme.FooterButtonBorder
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackground
 import io.designtoswiftui.countdown2binge.ui.theme.OnBackgroundSubtle
-import io.designtoswiftui.countdown2binge.ui.theme.SurfaceVariant
 
 /**
  * Footer section with "View Full Timeline" button and info text.
@@ -51,10 +54,19 @@ fun TimelineFooter(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(SurfaceVariant)
-                .clickable(onClick = onViewFullTimelineClick),
+                .height(70.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(FooterButtonBackground)
+                .border(
+                    width = 1.dp,
+                    color = FooterButtonBorder,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onViewFullTimelineClick
+                ),
             contentAlignment = Alignment.Center
         ) {
             Row(
