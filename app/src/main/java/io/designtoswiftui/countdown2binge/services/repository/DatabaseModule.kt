@@ -21,7 +21,10 @@ object DatabaseModule {
             AppDatabase::class.java,
             "countdown2binge.db"
         )
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3
+            )
             .build()
     }
 
@@ -38,5 +41,10 @@ object DatabaseModule {
     @Provides
     fun provideEpisodeDao(database: AppDatabase): EpisodeDao {
         return database.episodeDao()
+    }
+
+    @Provides
+    fun provideNotificationDao(database: AppDatabase): NotificationDao {
+        return database.notificationDao()
     }
 }

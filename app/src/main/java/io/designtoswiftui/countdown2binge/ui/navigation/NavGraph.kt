@@ -10,6 +10,8 @@ import androidx.navigation.navArgument
 import io.designtoswiftui.countdown2binge.models.ShowCategory
 import io.designtoswiftui.countdown2binge.ui.bingeready.BingeReadyScreen
 import io.designtoswiftui.countdown2binge.ui.followedshowdetail.FollowedShowDetailScreen
+import io.designtoswiftui.countdown2binge.ui.notifications.EditShowNotificationsScreen
+import io.designtoswiftui.countdown2binge.ui.notifications.NotificationsHubScreen
 import io.designtoswiftui.countdown2binge.ui.onboarding.OnboardingScreen
 import io.designtoswiftui.countdown2binge.ui.search.GenreListScreen
 import io.designtoswiftui.countdown2binge.ui.search.SearchScreen
@@ -52,6 +54,10 @@ sealed class Screen(val route: String) {
             val encodedTitle = URLEncoder.encode(videoTitle, "UTF-8")
             return "youtube_player/$videoKey/$encodedTitle"
         }
+    }
+    data object NotificationsHub : Screen("notifications_hub")
+    data object EditShowNotifications : Screen("edit_show_notifications/{showId}") {
+        fun createRoute(showId: Long): String = "edit_show_notifications/$showId"
     }
 }
 
@@ -144,7 +150,42 @@ fun NavGraph(
 
         // Settings screen
         composable(Screen.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(
+                onNotificationsClick = {
+                    navController.navigate(Screen.NotificationsHub.route)
+                }
+            )
+        }
+
+        // Notifications Hub screen
+        composable(Screen.NotificationsHub.route) {
+            NotificationsHubScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onShowClick = { showId ->
+                    navController.navigate(Screen.EditShowNotifications.createRoute(showId))
+                },
+                onUnlockPremiumClick = {
+                    // TODO: Navigate to paywall
+                }
+            )
+        }
+
+        // Edit Show Notifications screen
+        composable(
+            route = Screen.EditShowNotifications.route,
+            arguments = listOf(
+                navArgument("showId") {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            EditShowNotificationsScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         // Show Detail screen (by local showId)

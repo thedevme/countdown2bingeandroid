@@ -24,6 +24,9 @@ interface ShowDao {
     @Query("SELECT * FROM shows WHERE id = :id")
     suspend fun getById(id: Long): Show?
 
+    @Query("SELECT * FROM shows WHERE id = :id")
+    fun getByIdFlow(id: Long): Flow<Show?>
+
     @Query("SELECT * FROM shows WHERE tmdbId = :tmdbId")
     suspend fun getByTmdbId(tmdbId: Int): Show?
 

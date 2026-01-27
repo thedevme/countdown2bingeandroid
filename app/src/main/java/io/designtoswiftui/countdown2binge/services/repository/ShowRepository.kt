@@ -93,6 +93,23 @@ class ShowRepository @Inject constructor(
         return showDao.isShowFollowed(tmdbId)
     }
 
+    /**
+     * Get a show by its ID as a Flow.
+     */
+    fun getShowByIdFlow(id: Long): Flow<Show?> {
+        return showDao.getByIdFlow(id)
+    }
+
+    /**
+     * Get shows that are in production (returning or actively in production).
+     * Used for notification scheduling as these shows have upcoming content.
+     */
+    fun getInProductionShows(): Flow<List<Show>> {
+        return showDao.getShowsByStatus(
+            listOf(ShowStatus.RETURNING, ShowStatus.IN_PRODUCTION)
+        )
+    }
+
     // endregion
 
     // region Season Operations

@@ -70,6 +70,7 @@ import io.designtoswiftui.countdown2binge.viewmodels.SettingsViewModel
  */
 @Composable
 fun SettingsScreen(
+    onNotificationsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -177,7 +178,7 @@ fun SettingsScreen(
                 icon = Icons.Default.Notifications,
                 iconTint = DetailAccent,
                 title = "Reminders",
-                onClick = { /* TODO: Navigate to reminders */ }
+                onClick = onNotificationsClick
             )
             Spacer(modifier = Modifier.height(24.dp))
         }
