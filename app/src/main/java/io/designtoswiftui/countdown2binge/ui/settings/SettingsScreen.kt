@@ -1,6 +1,7 @@
 package io.designtoswiftui.countdown2binge.ui.settings
 
 import android.content.Intent
+import io.designtoswiftui.countdown2binge.BuildConfig
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -253,33 +254,35 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Debug Section
-        item {
-            SectionHeader(title = "Debug (Dev Only)", color = Color(0xFFE8A838))
-            SettingsRowWithToggle(
-                icon = Icons.Default.Star,
-                iconTint = Color(0xFFE8A838),
-                title = "Simulate Premium",
-                subtitle = "Enable to test cloud sync",
-                checked = debugSimulatePremium,
-                onCheckedChange = viewModel::setDebugSimulatePremium
-            )
-            SettingsDivider()
-            SettingsRowWithToggle(
-                icon = Icons.Default.Refresh,
-                iconTint = Color(0xFFE8A838),
-                title = "Show Full Onboarding",
-                checked = debugShowFullOnboarding,
-                onCheckedChange = viewModel::setDebugShowFullOnboarding
-            )
-            SettingsDivider()
-            SettingsRowClickable(
-                icon = Icons.Default.Refresh,
-                iconTint = Color(0xFFE8A838),
-                title = "Reset Onboarding State",
-                onClick = viewModel::resetOnboardingState
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+        // Debug Section - only visible in debug builds
+        if (BuildConfig.DEBUG) {
+            item {
+                SectionHeader(title = "Debug (Dev Only)", color = Color(0xFFE8A838))
+                SettingsRowWithToggle(
+                    icon = Icons.Default.Star,
+                    iconTint = Color(0xFFE8A838),
+                    title = "Simulate Premium",
+                    subtitle = "Enable to test cloud sync",
+                    checked = debugSimulatePremium,
+                    onCheckedChange = viewModel::setDebugSimulatePremium
+                )
+                SettingsDivider()
+                SettingsRowWithToggle(
+                    icon = Icons.Default.Refresh,
+                    iconTint = Color(0xFFE8A838),
+                    title = "Show Full Onboarding",
+                    checked = debugShowFullOnboarding,
+                    onCheckedChange = viewModel::setDebugShowFullOnboarding
+                )
+                SettingsDivider()
+                SettingsRowClickable(
+                    icon = Icons.Default.Refresh,
+                    iconTint = Color(0xFFE8A838),
+                    title = "Reset Onboarding State",
+                    onClick = viewModel::resetOnboardingState
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 }
