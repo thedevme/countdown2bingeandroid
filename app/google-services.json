@@ -13,7 +13,20 @@
           "package_name": "io.designtoswiftui.countdown2binge"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "924077090262-iv5g94e45u1vcts2df6fffh41nlp71pd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.designtoswiftui.countdown2binge",
+            "certificate_hash": "e30580a748fb9f397f5a60c22de32ff24dc94913"
+          }
+        },
+        {
+          "client_id": "924077090262-ukgta6gb9jim1haagjvhc3fg18gc4qa1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCNbZPtNnJH4dKx8j35XV-PuEhyswPBPlo"
@@ -21,7 +34,20 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "924077090262-ukgta6gb9jim1haagjvhc3fg18gc4qa1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "924077090262-v1eiri3fio9l15212ppaah9o4tpu5smp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "io.designtoswiftui.countdown2binge",
+                "app_store_id": "6476959214"
+              }
+            }
+          ]
         }
       }
     }

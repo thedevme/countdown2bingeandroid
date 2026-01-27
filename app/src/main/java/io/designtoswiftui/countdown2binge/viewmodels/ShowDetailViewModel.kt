@@ -387,8 +387,8 @@ class ShowDetailViewModel @Inject constructor(
             // First fetch franchises from Firebase
             franchiseService.fetchFranchises()
 
-            // Check if this show has a franchise
-            val foundFranchise = franchiseService.franchiseForShowId(showTmdbId)
+            // Check if this show has a franchise (O(1) lookup)
+            val foundFranchise = franchiseService.getFranchise(forShowId = showTmdbId)
             _franchise.value = foundFranchise
             _hasFranchise.value = foundFranchise != null
         }

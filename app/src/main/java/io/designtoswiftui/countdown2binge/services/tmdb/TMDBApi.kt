@@ -91,4 +91,12 @@ interface TMDBApi {
         @Path("tv_id") showId: Int,
         @Query("page") page: Int = 1
     ): TMDBSearchResponse
+
+    /**
+     * Get watch providers (streaming services) for a TV show.
+     */
+    @GET("tv/{tv_id}/watch/providers")
+    suspend fun getWatchProviders(
+        @Path("tv_id") showId: Int
+    ): TMDBWatchProvidersResponse
 }

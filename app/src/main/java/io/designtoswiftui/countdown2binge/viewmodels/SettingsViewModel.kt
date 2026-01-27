@@ -1,15 +1,18 @@
 package io.designtoswiftui.countdown2binge.viewmodels
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.designtoswiftui.countdown2binge.models.CountdownDisplayMode
 import io.designtoswiftui.countdown2binge.models.Show
+import io.designtoswiftui.countdown2binge.services.FranchiseMigrationService
 import io.designtoswiftui.countdown2binge.services.auth.AuthManager
 import io.designtoswiftui.countdown2binge.services.auth.AuthState
 import io.designtoswiftui.countdown2binge.services.premium.PremiumManager
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.settings.SettingsRepository
+import io.designtoswiftui.countdown2binge.services.sync.CloudSyncService
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +29,9 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val premiumManager: PremiumManager,
     private val authManager: AuthManager,
-    private val showRepository: ShowRepository
+    private val showRepository: ShowRepository,
+    private val franchiseMigrationService: FranchiseMigrationService,
+    private val cloudSyncService: CloudSyncService
 ) : ViewModel() {
 
     /**
@@ -210,6 +215,54 @@ class SettingsViewModel @Inject constructor(
     fun resetOnboardingState() {
         viewModelScope.launch {
             settingsRepository.resetOnboardingState()
+        }
+    }
+
+    /**
+     * Force re-run franchise migration to update spinoff data.
+     * Useful after Firebase franchise data is updated.
+     */
+    fun refreshFranchiseData() {
+        viewModelScope.launch {
+            franchiseMigrationService.forceRunMigration()
+        }
+    }
+
+    // endregion
+
+    // region Auth
+
+    /**
+     * Sign in with Google.
+     * Requires Activity context for Credential Manager.
+     * Triggers cloud sync after successful sign-in.
+     */
+    fun signIn(activityContext: Context) {
+        android.util.Log.d("SettingsViewModel", "signIn called with context: $activityContext")
+        viewModelScope.launch {
+            android.util.Log.d("SettingsViewModel", "Calling authManager.signInWithGoogle...")
+            val result = authManager.signInWithGoogle(activityContext)
+            android.util.Log.d("SettingsViewModel", "signInWithGoogle result: $result")
+
+            // Sync shows after successful sign-in
+            if (result.isSuccess) {
+                android.util.Log.d("SettingsViewModel", "Sign-in successful, starting cloud sync...")
+                try {
+                    val syncResult = cloudSyncService.syncOnSignIn()
+                    android.util.Log.d("SettingsViewModel", "Cloud sync complete: restored=${syncResult.showsRestoredFromCloud}, backedUp=${syncResult.showsBackedUpToCloud}")
+                } catch (e: Exception) {
+                    android.util.Log.e("SettingsViewModel", "Cloud sync failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Sign out the current user.
+     */
+    fun signOut() {
+        viewModelScope.launch {
+            authManager.signOut()
         }
     }
 

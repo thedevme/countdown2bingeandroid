@@ -12,7 +12,7 @@ import io.designtoswiftui.countdown2binge.models.Show
 
 @Database(
     entities = [Show::class, Season::class, Episode::class, ScheduledNotification::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -71,6 +71,18 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_scheduled_notifications_showId ON scheduled_notifications(showId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_scheduled_notifications_status ON scheduled_notifications(status)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_scheduled_notifications_scheduledDate ON scheduled_notifications(scheduledDate)")
+            }
+        }
+
+        /**
+         * Migration from version 3 to 4: Add relatedShowIdsJson column for franchise/spinoff data.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add relatedShowIdsJson column (nullable) to store related TMDB IDs as JSON
+                db.execSQL(
+                    "ALTER TABLE shows ADD COLUMN relatedShowIdsJson TEXT"
+                )
             }
         }
     }

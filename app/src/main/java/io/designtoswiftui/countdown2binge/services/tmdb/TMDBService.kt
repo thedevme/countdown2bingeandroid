@@ -152,6 +152,26 @@ class TMDBService @Inject constructor() {
     }
 
     /**
+     * Get watch providers (streaming services) for a TV show.
+     * Returns providers for the US region by default.
+     */
+    suspend fun getWatchProviders(showId: Int, region: String = "US"): Result<List<TMDBWatchProvider>> {
+        return try {
+            val response = executeRequest { api.getWatchProviders(showId) }
+            response.map { providersResponse ->
+                val regionData = providersResponse.results?.get(region)
+                // Combine flatrate (subscription) and ads (free with ads) providers
+                val providers = mutableListOf<TMDBWatchProvider>()
+                regionData?.flatrate?.let { providers.addAll(it) }
+                regionData?.ads?.let { providers.addAll(it) }
+                providers.distinctBy { it.providerId }.sortedBy { it.displayPriority ?: 100 }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Build full image URL from path.
      */
     fun buildImageUrl(path: String?, size: String = POSTER_SIZE): String? {

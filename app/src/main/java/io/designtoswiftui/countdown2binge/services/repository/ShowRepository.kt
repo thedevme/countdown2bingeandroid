@@ -1,5 +1,7 @@
 package io.designtoswiftui.countdown2binge.services.repository
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import io.designtoswiftui.countdown2binge.models.Episode
 import io.designtoswiftui.countdown2binge.models.Season
 import io.designtoswiftui.countdown2binge.models.SeasonState
@@ -266,6 +268,41 @@ class ShowRepository @Inject constructor(
         }
 
         return showId
+    }
+
+    // endregion
+
+    // region Franchise/Spinoff Operations
+
+    /**
+     * Update the related show IDs for a show (spinoffs and parent).
+     */
+    suspend fun updateRelatedShowIds(showId: Long, relatedIds: List<Int>) {
+        val json = if (relatedIds.isNotEmpty()) {
+            Gson().toJson(relatedIds)
+        } else {
+            null
+        }
+        showDao.updateRelatedShowIds(showId, json)
+    }
+
+    /**
+     * Get the related show IDs for a show.
+     */
+    suspend fun getRelatedShowIds(showId: Long): List<Int> {
+        val json = showDao.getRelatedShowIdsJson(showId) ?: return emptyList()
+        return try {
+            Gson().fromJson(json, object : TypeToken<List<Int>>() {}.type)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Get the count of followed shows.
+     */
+    suspend fun getFollowedShowCount(): Int {
+        return showDao.getFollowedShowCount()
     }
 
     // endregion

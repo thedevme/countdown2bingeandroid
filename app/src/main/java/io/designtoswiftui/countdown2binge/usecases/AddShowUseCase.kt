@@ -2,6 +2,8 @@ package io.designtoswiftui.countdown2binge.usecases
 
 import android.util.Log
 import io.designtoswiftui.countdown2binge.models.Show
+import io.designtoswiftui.countdown2binge.services.firebase.FranchiseService
+import io.designtoswiftui.countdown2binge.services.premium.PremiumManager
 import io.designtoswiftui.countdown2binge.services.repository.ShowRepository
 import io.designtoswiftui.countdown2binge.services.tmdb.ShowDataAggregator
 import io.designtoswiftui.countdown2binge.services.tmdb.ShowProcessor
@@ -25,12 +27,18 @@ private const val TAG = "AddShowUseCase"
  *
  * This provides immediate feedback while large shows (SVU, Grey's Anatomy)
  * download their 20+ seasons in the background.
+ *
+ * Also handles:
+ * - Premium limit check (3 shows for free users)
+ * - Franchise/spinoff linking from Firebase
  */
 @Singleton
 class AddShowUseCase @Inject constructor(
     private val repository: ShowRepository,
     private val aggregator: ShowDataAggregator,
-    private val processor: ShowProcessor
+    private val processor: ShowProcessor,
+    private val franchiseService: FranchiseService,
+    private val premiumManager: PremiumManager
 ) {
     // Background scope for fetching remaining seasons after quick add
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -48,11 +56,20 @@ class AddShowUseCase @Inject constructor(
      * Execute the add show flow using two-phase approach:
      * 1. Quick: Save show with latest season (for correct timeline placement)
      * 2. Background: Fetch all remaining seasons (no blocking)
+     * 3. Link franchise data (spinoffs)
      *
      * @param tmdbId The TMDB ID of the show to add
      * @return Result containing the saved show or error
      */
     suspend fun execute(tmdbId: Int): Result<Show> {
+        // Check show limit for free users
+        val currentCount = repository.getFollowedShowCount()
+        val showLimit = premiumManager.showLimit
+        if (currentCount >= showLimit) {
+            Log.w(TAG, "Show limit reached: $currentCount >= $showLimit")
+            return Result.failure(AddShowException.ShowLimitReached(showLimit))
+        }
+
         // Check if already followed
         if (repository.isShowFollowed(tmdbId)) {
             val existingShow = repository.getShow(tmdbId)
@@ -125,6 +142,9 @@ class AddShowUseCase @Inject constructor(
             ?: return Result.failure(AddShowException.SaveFailed(tmdbId, null))
 
         Log.d(TAG, "Quick add complete: '${savedShow.title}' saved with ${sortedQuickSeasons.size} seasons")
+
+        // Link franchise/spinoff data
+        saveFranchiseData(tmdbId, showId)
 
         // PHASE 2: Background fetch for full season details
         // Only needed if there are more seasons than just the latest
@@ -210,6 +230,38 @@ class AddShowUseCase @Inject constructor(
     }
 
     /**
+     * Save franchise data for a show.
+     * Links the show to its related shows (parent + spinoffs) from Firebase.
+     */
+    private suspend fun saveFranchiseData(tmdbId: Int, showId: Long) {
+        try {
+            // 1. Ensure franchise data is loaded from Firebase (uses memory cache)
+            franchiseService.fetchFranchises()
+
+            // 2. Check if this show is part of a franchise
+            val franchise = franchiseService.getFranchise(forShowId = tmdbId)
+            if (franchise == null) {
+                Log.d(TAG, "Show $tmdbId is not part of any franchise")
+                return
+            }
+
+            Log.d(TAG, "Found franchise: ${franchise.franchiseName?.en} for show $tmdbId")
+
+            // 3. Get all related show IDs (excludes self)
+            val relatedIds = franchiseService.getSpinoffIds(forShowId = tmdbId)
+
+            Log.d(TAG, "Related show IDs: $relatedIds")
+
+            // 4. Save related IDs to local database
+            repository.updateRelatedShowIds(showId, relatedIds)
+            Log.d(TAG, "Successfully saved ${relatedIds.size} related show IDs")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save franchise data: ${e.message}")
+            // Non-fatal error - show is still added, just without spinoff links
+        }
+    }
+
+    /**
      * Execute and return a typed result instead of Result<Show>.
      */
     suspend fun executeWithResult(tmdbId: Int): AddShowResult {
@@ -243,6 +295,10 @@ class AddShowUseCase @Inject constructor(
  * Exceptions specific to the AddShowUseCase.
  */
 sealed class AddShowException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+
+    class ShowLimitReached(val limit: Int) : AddShowException(
+        "Free tier limit of $limit shows reached. Upgrade to premium for unlimited shows."
+    )
 
     class AlreadyFollowed(val tmdbId: Int) : AddShowException(
         "Show with TMDB ID $tmdbId is already being followed"

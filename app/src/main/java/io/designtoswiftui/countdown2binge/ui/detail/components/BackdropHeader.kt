@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -25,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import io.designtoswiftui.countdown2binge.services.tmdb.TMDBService
@@ -48,6 +52,7 @@ fun BackdropHeader(
     logoPath: String?,
     title: String,
     onShareClick: (() -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -90,28 +95,60 @@ fun BackdropHeader(
                 )
         )
 
-        // Share button (top-right corner)
-        if (onShareClick != null) {
-            Box(
+        // Action buttons (top-right corner)
+        if (onShareClick != null || onDeleteClick != null) {
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp)
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.3f),
-                        shape = CircleShape
-                    )
-                    .clickable { onShareClick() },
-                contentAlignment = Alignment.Center
+                    .statusBarsPadding()
+                    .padding(top = 8.dp, end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Share,
-                    contentDescription = "Share",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                // Delete button
+                if (onDeleteClick != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.3f),
+                                shape = CircleShape
+                            )
+                            .clickable { onDeleteClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Remove show",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Share button
+                if (onShareClick != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.3f),
+                                shape = CircleShape
+                            )
+                            .clickable { onShareClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = "Share",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
 

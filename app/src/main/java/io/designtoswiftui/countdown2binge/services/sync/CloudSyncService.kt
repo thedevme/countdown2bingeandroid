@@ -5,6 +5,7 @@ import com.google.firebase.database.FirebaseDatabase
 import io.designtoswiftui.countdown2binge.services.auth.AuthManager
 import io.designtoswiftui.countdown2binge.services.premium.PremiumManager
 import io.designtoswiftui.countdown2binge.services.repository.ShowDao
+import io.designtoswiftui.countdown2binge.services.settings.SettingsRepository
 import io.designtoswiftui.countdown2binge.usecases.AddShowUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -27,7 +29,8 @@ class CloudSyncService @Inject constructor(
     private val premiumManager: PremiumManager,
     private val showDao: ShowDao,
     private val addShowUseCase: AddShowUseCase,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val settingsRepository: SettingsRepository
 ) {
     companion object {
         private const val TAG = "CloudSyncService"
@@ -49,6 +52,15 @@ class CloudSyncService @Inject constructor(
     // Offline queue for pending operations
     private val pendingPushes = mutableSetOf<Int>()
     private val pendingRemovals = mutableSetOf<Int>()
+
+    /**
+     * Check if user has premium (real or simulated for debug).
+     */
+    private suspend fun isPremiumOrSimulated(): Boolean {
+        val realPremium = premiumManager.isPremium.value
+        val simulatedPremium = settingsRepository.debugSimulatePremium.first()
+        return realPremium || simulatedPremium
+    }
 
     /**
      * Whether sync is allowed (signed in and premium).
@@ -103,7 +115,8 @@ class CloudSyncService @Inject constructor(
             val toAddLocally = cloudTmdbIds - localTmdbIds
 
             // 4. Shows to push to cloud (in local, not cloud) - only if premium
-            val toPushToCloud = if (premiumManager.isPremium.value) {
+            val isPremium = isPremiumOrSimulated()
+            val toPushToCloud = if (isPremium) {
                 localTmdbIds - cloudTmdbIds
             } else {
                 emptySet()
@@ -144,7 +157,7 @@ class CloudSyncService @Inject constructor(
             }
 
             // 7. Update last synced timestamp
-            if (premiumManager.isPremium.value) {
+            if (isPremium) {
                 updateLastSyncedAt(userId)
             }
 

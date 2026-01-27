@@ -2,8 +2,10 @@ package io.designtoswiftui.countdown2binge.services.premium
 
 import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.revenuecat.purchases.CustomerInfo
+import io.designtoswiftui.countdown2binge.BuildConfig
 import com.revenuecat.purchases.LogLevel
 import com.revenuecat.purchases.Offerings
 import com.revenuecat.purchases.Package
@@ -38,6 +40,9 @@ class PremiumManager @Inject constructor(
 
         // Free tier limits
         const val FREE_SHOW_LIMIT = 3
+
+        // Google Play Store package name
+        private const val PLAY_STORE_PACKAGE = "com.android.vending"
     }
 
     private val _isPremium = MutableStateFlow(false)
@@ -54,6 +59,36 @@ class PremiumManager @Inject constructor(
      */
     val showLimit: Int
         get() = if (_isPremium.value) Int.MAX_VALUE else FREE_SHOW_LIMIT
+
+    /**
+     * Check if this is a test build (Firebase App Distribution or sideload).
+     * Similar to iOS TestFlight detection using sandbox receipt.
+     *
+     * In debug builds, returns false (developers test with debug toggle).
+     * In release builds not from Play Store, returns true (tester build).
+     */
+    private fun isTestBuild(): Boolean {
+        // In debug builds, don't auto-enable premium (use debug toggle instead)
+        if (BuildConfig.DEBUG) {
+            return false
+        }
+
+        // In release builds, check if NOT installed from Google Play Store
+        // This indicates Firebase App Distribution or sideload (tester)
+        val installerPackage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getInstallerPackageName(context.packageName)
+        }
+
+        val isFromPlayStore = installerPackage == PLAY_STORE_PACKAGE
+
+        Log.d(TAG, "Installer package: $installerPackage, isFromPlayStore: $isFromPlayStore")
+
+        // If it's a release build but NOT from Play Store, it's a tester
+        return !isFromPlayStore
+    }
 
     /**
      * Whether the user can use cloud sync (premium feature).
@@ -73,7 +108,15 @@ class PremiumManager @Inject constructor(
             )
             Log.d(TAG, "RevenueCat configured successfully")
 
-            // Fetch initial customer info
+            // Auto-enable premium for testers (Firebase App Distribution)
+            // Similar to iOS TestFlight detection
+            if (isTestBuild()) {
+                Log.d(TAG, "Test build detected - auto-enabling premium for tester")
+                _isPremium.value = true
+                return
+            }
+
+            // Fetch initial customer info for production users
             refreshPremiumStatus()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to configure RevenueCat", e)

@@ -58,4 +58,15 @@ interface ShowDao {
 
     @Query("DELETE FROM shows WHERE tmdbId = :tmdbId")
     suspend fun deleteByTmdbId(tmdbId: Int)
+
+    // Franchise/Spinoff related queries
+
+    @Query("UPDATE shows SET relatedShowIdsJson = :relatedIdsJson WHERE id = :showId")
+    suspend fun updateRelatedShowIds(showId: Long, relatedIdsJson: String?)
+
+    @Query("SELECT relatedShowIdsJson FROM shows WHERE id = :showId")
+    suspend fun getRelatedShowIdsJson(showId: Long): String?
+
+    @Query("SELECT COUNT(*) FROM shows")
+    suspend fun getFollowedShowCount(): Int
 }

@@ -35,12 +35,15 @@ class FranchiseService @Inject constructor() {
 
     private var hasLoaded = false
 
+    // O(1) lookup map: TMDB ID -> Franchise
+    private val showToFranchise: MutableMap<Int, Franchise> = mutableMapOf()
+
     /**
      * Fetch all franchises from Firebase.
      * Caches results and skips re-fetch if already loaded.
      */
     suspend fun fetchFranchises() {
-        // Skip if already loaded with data
+        // Skip if already loaded with data (memory cache)
         if (hasLoaded && _franchises.value.isNotEmpty()) return
 
         _isLoading.value = true
@@ -64,7 +67,10 @@ class FranchiseService @Inject constructor() {
             _franchises.value = loadedFranchises.sortedBy { it.parentShow?.title }
             hasLoaded = _franchises.value.isNotEmpty()
 
-            Log.d(TAG, "Loaded ${_franchises.value.size} franchises")
+            // Build O(1) lookup map after fetching
+            buildLookupMap()
+
+            Log.d(TAG, "Loaded ${_franchises.value.size} franchises, built lookup map with ${showToFranchise.size} entries")
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch franchises", e)
@@ -74,30 +80,69 @@ class FranchiseService @Inject constructor() {
     }
 
     /**
+     * Build O(1) lookup map from TMDB ID to Franchise.
+     * Maps both parent shows and all spinoffs to their franchise.
+     */
+    private fun buildLookupMap() {
+        showToFranchise.clear()
+        _franchises.value.forEach { franchise ->
+            // Map parent show
+            franchise.parentShow?.tmdbId?.let { parentId ->
+                showToFranchise[parentId] = franchise
+            }
+            // Map all spinoffs
+            franchise.spinoffs.forEach { spinoff ->
+                showToFranchise[spinoff.tmdbId] = franchise
+            }
+        }
+    }
+
+    /**
      * Find the franchise for a given show ID.
-     * Checks both parent shows and spinoffs.
+     * O(1) lookup using the pre-built map.
      *
      * @param showId The TMDB ID of the show
      * @return The franchise if found, null otherwise
      */
-    fun franchiseForShowId(showId: Int): Franchise? {
-        // Check if it's a parent show
-        _franchises.value.find { it.parentShow?.tmdbId == showId }?.let { return it }
+    fun getFranchise(forShowId: Int): Franchise? {
+        return showToFranchise[forShowId]
+    }
 
-        // Check if it's a spinoff
-        _franchises.value.forEach { franchise ->
-            if (franchise.spinoffs.any { it.tmdbId == showId }) {
-                return franchise
-            }
-        }
-        return null
+    /**
+     * Legacy method - use getFranchise instead.
+     */
+    @Deprecated("Use getFranchise instead", ReplaceWith("getFranchise(showId)"))
+    fun franchiseForShowId(showId: Int): Franchise? {
+        return getFranchise(showId)
     }
 
     /**
      * Check if a show has a franchise (either as parent or spinoff).
+     * O(1) lookup.
      */
     fun hasFranchise(showId: Int): Boolean {
-        return franchiseForShowId(showId) != null
+        return showToFranchise.containsKey(showId)
+    }
+
+    /**
+     * Get all related show IDs for a given show (parent + spinoffs, excluding self).
+     *
+     * @param forShowId The TMDB ID of the show
+     * @return List of related TMDB IDs, empty if not part of a franchise
+     */
+    fun getSpinoffIds(forShowId: Int): List<Int> {
+        val franchise = showToFranchise[forShowId] ?: return emptyList()
+
+        val allIds = mutableListOf<Int>()
+
+        // Add parent show ID
+        franchise.parentShow?.tmdbId?.let { allIds.add(it) }
+
+        // Add all spinoff IDs
+        allIds.addAll(franchise.spinoffs.map { it.tmdbId })
+
+        // IMPORTANT: Exclude self
+        return allIds.filter { it != forShowId }
     }
 
     /**
@@ -105,6 +150,7 @@ class FranchiseService @Inject constructor() {
      */
     suspend fun refresh() {
         hasLoaded = false
+        showToFranchise.clear()
         fetchFranchises()
     }
 }

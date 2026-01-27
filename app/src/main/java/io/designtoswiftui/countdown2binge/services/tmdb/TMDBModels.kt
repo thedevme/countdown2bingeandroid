@@ -65,7 +65,8 @@ data class TMDBSeasonSummary(
     @Json(name = "poster_path") val posterPath: String?,
     @Json(name = "season_number") val seasonNumber: Int,
     @Json(name = "episode_count") val episodeCount: Int?,
-    @Json(name = "air_date") val airDate: String?
+    @Json(name = "air_date") val airDate: String?,
+    @Json(name = "vote_average") val voteAverage: Double?
 )
 
 /**
@@ -231,4 +232,36 @@ data class TMDBCrewMember(
     val job: String?,
     val department: String?,
     @Json(name = "profile_path") val profilePath: String?
+)
+
+/**
+ * Response from TMDB watch providers endpoint.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBWatchProvidersResponse(
+    val id: Int,
+    val results: Map<String, TMDBWatchProviderRegion>?
+)
+
+/**
+ * Watch provider data for a specific region.
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBWatchProviderRegion(
+    val link: String?,
+    val flatrate: List<TMDBWatchProvider>?,
+    val rent: List<TMDBWatchProvider>?,
+    val buy: List<TMDBWatchProvider>?,
+    val ads: List<TMDBWatchProvider>?
+)
+
+/**
+ * Individual watch provider (streaming service).
+ */
+@JsonClass(generateAdapter = true)
+data class TMDBWatchProvider(
+    @Json(name = "provider_id") val providerId: Int,
+    @Json(name = "provider_name") val providerName: String,
+    @Json(name = "logo_path") val logoPath: String?,
+    @Json(name = "display_priority") val displayPriority: Int?
 )

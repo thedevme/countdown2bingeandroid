@@ -9,8 +9,13 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import io.designtoswiftui.countdown2binge.services.FranchiseMigrationService
 import io.designtoswiftui.countdown2binge.services.RefreshWorker
 import io.designtoswiftui.countdown2binge.services.premium.PremiumManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -23,6 +28,12 @@ class Countdown2BingeApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var premiumManager: PremiumManager
 
+    @Inject
+    lateinit var franchiseMigrationService: FranchiseMigrationService
+
+    // Application-scoped coroutine scope
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -32,6 +43,7 @@ class Countdown2BingeApplication : Application(), Configuration.Provider {
         super.onCreate()
         initializeRevenueCat()
         scheduleBackgroundRefresh()
+        runFranchiseMigration()
     }
 
     /**
@@ -63,5 +75,15 @@ class Countdown2BingeApplication : Application(), Configuration.Provider {
             ExistingPeriodicWorkPolicy.KEEP, // Don't replace if already scheduled
             refreshWorkRequest
         )
+    }
+
+    /**
+     * Run franchise migration to backfill relatedShowIds for existing shows.
+     * This ensures existing users get spinoff data linked to their shows.
+     */
+    private fun runFranchiseMigration() {
+        applicationScope.launch {
+            franchiseMigrationService.migrateIfNeeded()
+        }
     }
 }

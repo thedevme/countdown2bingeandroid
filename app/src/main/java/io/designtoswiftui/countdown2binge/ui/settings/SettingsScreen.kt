@@ -1,5 +1,8 @@
 package io.designtoswiftui.countdown2binge.ui.settings
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import io.designtoswiftui.countdown2binge.BuildConfig
 import android.net.Uri
@@ -71,9 +74,12 @@ import io.designtoswiftui.countdown2binge.viewmodels.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onNotificationsClick: () -> Unit = {},
+    onUpgradeClick: () -> Unit = {},
+    onAllShowsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val activity = context.findActivity()
 
     val isPremium by viewModel.isPremium.collectAsState()
     val authState by viewModel.authState.collectAsState()
@@ -112,17 +118,60 @@ fun SettingsScreen(
         // Account Section
         item {
             SectionHeader(title = "Account")
-            AccountRow(authState = authState)
+            AccountRow(
+                authState = authState,
+                onClick = {
+                    android.util.Log.d("SettingsScreen", "Account clicked, authState: $authState, activity: $activity")
+                    when (authState) {
+                        is AuthState.SignedOut -> {
+                            android.util.Log.d("SettingsScreen", "Attempting sign in...")
+                            activity?.let { viewModel.signIn(it) }
+                                ?: android.util.Log.e("SettingsScreen", "Activity is null!")
+                        }
+                        is AuthState.SignedIn -> viewModel.signOut()
+                        else -> android.util.Log.d("SettingsScreen", "Auth state is neither SignedIn nor SignedOut")
+                    }
+                }
+            )
             Spacer(modifier = Modifier.height(24.dp))
         }
 
         // Saved Shows Section (show if user has any saved shows)
         if (savedShows.isNotEmpty()) {
             item {
+                // Header row: "Saved Shows" on left, "synced: X/Y" on right
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Saved Shows",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = OnBackgroundMuted,
+                        letterSpacing = 0.5.sp
+                    )
+                    val syncedCount = savedShows.count { it.isSynced }
+                    Text(
+                        text = "Synced: $syncedCount/${savedShows.size}",
+                        fontSize = 13.sp,
+                        color = OnBackgroundMuted,
+                        letterSpacing = 0.5.sp
+                    )
+                }
                 SavedShowsSection(
                     shows = savedShows,
-                    syncedCount = savedShows.count { it.isSynced },
-                    canSync = isPremium && authState is AuthState.SignedIn
+                    isPremium = isPremium,
+                    onViewAllClick = {
+                        if (isPremium) {
+                            onAllShowsClick()
+                        } else {
+                            onUpgradeClick()
+                        }
+                    }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -283,6 +332,13 @@ fun SettingsScreen(
                     title = "Reset Onboarding State",
                     onClick = viewModel::resetOnboardingState
                 )
+                SettingsDivider()
+                SettingsRowClickable(
+                    icon = Icons.Default.Refresh,
+                    iconTint = Color(0xFFE8A838),
+                    title = "Refresh Franchise Data",
+                    onClick = viewModel::refreshFranchiseData
+                )
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -358,13 +414,16 @@ private fun PremiumStatusRow(isPremium: Boolean) {
 }
 
 @Composable
-private fun AccountRow(authState: AuthState) {
+private fun AccountRow(
+    authState: AuthState,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SurfaceVariant)
-            .clickable { /* TODO: Manage account */ }
+            .clickable(onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -415,8 +474,8 @@ private fun AccountRow(authState: AuthState) {
 @Composable
 private fun SavedShowsSection(
     shows: List<Show>,
-    syncedCount: Int,
-    canSync: Boolean
+    isPremium: Boolean,
+    onViewAllClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -425,27 +484,6 @@ private fun SavedShowsSection(
             .background(SurfaceVariant)
             .padding(16.dp)
     ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "SAVED SHOWS",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = OnBackgroundMuted,
-                letterSpacing = 0.5.sp
-            )
-            Text(
-                text = if (canSync) "Synced: $syncedCount / ${shows.size}" else "Not synced",
-                fontSize = 12.sp,
-                color = OnBackgroundMuted
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
         // Show list (first 3)
         shows.take(3).forEach { show ->
             SavedShowRow(show = show)
@@ -457,38 +495,36 @@ private fun SavedShowsSection(
             }
         }
 
-        // View all link
-        if (shows.size > 3) {
-            HorizontalDivider(
-                color = OnBackgroundMuted.copy(alpha = 0.2f),
-                modifier = Modifier.padding(vertical = 8.dp)
+        // View all / Upgrade link
+        HorizontalDivider(
+            color = OnBackgroundMuted.copy(alpha = 0.2f),
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onViewAllClick),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isPremium) "View All Shows" else "Upgrade to Sync",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = DetailAccent
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { /* TODO: View all shows */ },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "View All Shows",
+                    text = if (isPremium) "${shows.size}" else "Pro",
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = DetailAccent
+                    color = OnBackgroundMuted
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${shows.size}",
-                        fontSize = 14.sp,
-                        color = OnBackgroundMuted
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = OnBackgroundMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = OnBackgroundMuted,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
@@ -826,4 +862,16 @@ private fun SettingsDivider() {
         color = OnBackgroundMuted.copy(alpha = 0.2f),
         modifier = Modifier.padding(start = 48.dp)
     )
+}
+
+/**
+ * Find the Activity from a Context by unwrapping ContextWrappers.
+ */
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }

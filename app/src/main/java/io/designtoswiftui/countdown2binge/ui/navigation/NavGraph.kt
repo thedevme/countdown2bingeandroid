@@ -13,8 +13,10 @@ import io.designtoswiftui.countdown2binge.ui.followedshowdetail.FollowedShowDeta
 import io.designtoswiftui.countdown2binge.ui.notifications.EditShowNotificationsScreen
 import io.designtoswiftui.countdown2binge.ui.notifications.NotificationsHubScreen
 import io.designtoswiftui.countdown2binge.ui.onboarding.OnboardingScreen
+import io.designtoswiftui.countdown2binge.ui.premium.PaywallScreen
 import io.designtoswiftui.countdown2binge.ui.search.GenreListScreen
 import io.designtoswiftui.countdown2binge.ui.search.SearchScreen
+import io.designtoswiftui.countdown2binge.ui.settings.AllShowsScreen
 import io.designtoswiftui.countdown2binge.ui.settings.SettingsScreen
 import io.designtoswiftui.countdown2binge.ui.showdetail.EpisodeListScreen
 import io.designtoswiftui.countdown2binge.ui.showdetail.ShowDetailScreen
@@ -59,6 +61,8 @@ sealed class Screen(val route: String) {
     data object EditShowNotifications : Screen("edit_show_notifications/{showId}") {
         fun createRoute(showId: Long): String = "edit_show_notifications/$showId"
     }
+    data object Paywall : Screen("paywall")
+    data object AllShows : Screen("all_shows")
 }
 
 /**
@@ -153,6 +157,12 @@ fun NavGraph(
             SettingsScreen(
                 onNotificationsClick = {
                     navController.navigate(Screen.NotificationsHub.route)
+                },
+                onUpgradeClick = {
+                    navController.navigate(Screen.Paywall.route)
+                },
+                onAllShowsClick = {
+                    navController.navigate(Screen.AllShows.route)
                 }
             )
         }
@@ -167,7 +177,7 @@ fun NavGraph(
                     navController.navigate(Screen.EditShowNotifications.createRoute(showId))
                 },
                 onUnlockPremiumClick = {
-                    // TODO: Navigate to paywall
+                    navController.navigate(Screen.Paywall.route)
                 }
             )
         }
@@ -332,6 +342,30 @@ fun NavGraph(
                 videoTitle = videoTitle,
                 onDismiss = {
                     navController.popBackStack()
+                }
+            )
+        }
+
+        // Paywall screen
+        composable(Screen.Paywall.route) {
+            PaywallScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onPurchaseComplete = {
+                    // Purchase completed, screen will auto-dismiss
+                }
+            )
+        }
+
+        // All Shows screen
+        composable(Screen.AllShows.route) {
+            AllShowsScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onShowClick = { showId ->
+                    navController.navigate(Screen.FollowedShowDetail.createRoute(showId))
                 }
             )
         }
