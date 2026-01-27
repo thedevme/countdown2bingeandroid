@@ -89,6 +89,15 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database.ktx)
+    implementation(libs.firebase.auth.ktx)
+
+    // Google Sign-In (Credential Manager)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services)
+    implementation(libs.googleid)
+
+    // RevenueCat
+    implementation(libs.revenuecat)
 
     // Gson (for Firebase JSON parsing)
     implementation(libs.gson)

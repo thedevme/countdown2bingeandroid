@@ -9,6 +9,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.designtoswiftui.countdown2binge.models.ShowCategory
 import io.designtoswiftui.countdown2binge.ui.bingeready.BingeReadyScreen
+import io.designtoswiftui.countdown2binge.ui.followedshowdetail.FollowedShowDetailScreen
+import io.designtoswiftui.countdown2binge.ui.onboarding.OnboardingScreen
 import io.designtoswiftui.countdown2binge.ui.search.GenreListScreen
 import io.designtoswiftui.countdown2binge.ui.search.SearchScreen
 import io.designtoswiftui.countdown2binge.ui.settings.SettingsScreen
@@ -24,6 +26,7 @@ import java.net.URLEncoder
  * Navigation routes for the app.
  */
 sealed class Screen(val route: String) {
+    data object Onboarding : Screen("onboarding")
     data object Timeline : Screen("timeline")
     data object FullTimeline : Screen("full_timeline")
     data object BingeReady : Screen("binge_ready")
@@ -34,6 +37,9 @@ sealed class Screen(val route: String) {
     }
     data object ShowDetailByTmdb : Screen("show_detail_tmdb/{tmdbId}") {
         fun createRoute(tmdbId: Int): String = "show_detail_tmdb/$tmdbId"
+    }
+    data object FollowedShowDetail : Screen("followed_show_detail/{showId}") {
+        fun createRoute(showId: Long): String = "followed_show_detail/$showId"
     }
     data object EpisodeList : Screen("episode_list/{seasonId}") {
         fun createRoute(seasonId: Long): String = "episode_list/$seasonId"
@@ -76,11 +82,25 @@ fun NavGraph(
         startDestination = startDestination,
         modifier = modifier
     ) {
+        // Onboarding screen
+        composable(Screen.Onboarding.route) {
+            OnboardingScreen(
+                onOnboardingComplete = {
+                    navController.navigate(Screen.Timeline.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                },
+                onShowClick = { tmdbId ->
+                    navController.navigate(Screen.ShowDetailByTmdb.createRoute(tmdbId))
+                }
+            )
+        }
+
         // Timeline screen
         composable(Screen.Timeline.route) {
             TimelineScreen(
                 onShowClick = { showId ->
-                    navController.navigate(Screen.ShowDetail.createRoute(showId))
+                    navController.navigate(Screen.FollowedShowDetail.createRoute(showId))
                 },
                 onViewFullTimelineClick = {
                     navController.navigate(Screen.FullTimeline.route)
@@ -95,7 +115,7 @@ fun NavGraph(
                     navController.popBackStack()
                 },
                 onShowClick = { showId ->
-                    navController.navigate(Screen.ShowDetail.createRoute(showId))
+                    navController.navigate(Screen.FollowedShowDetail.createRoute(showId))
                 }
             )
         }
@@ -104,7 +124,7 @@ fun NavGraph(
         composable(Screen.BingeReady.route) {
             BingeReadyScreen(
                 onSeasonClick = { showId ->
-                    navController.navigate(Screen.ShowDetail.createRoute(showId))
+                    navController.navigate(Screen.FollowedShowDetail.createRoute(showId))
                 }
             )
         }
@@ -174,6 +194,31 @@ fun NavGraph(
                 },
                 onShowClick = { showTmdbId ->
                     navController.navigate(Screen.ShowDetailByTmdb.createRoute(showTmdbId))
+                },
+                onVideoClick = { videoKey, videoTitle ->
+                    navController.navigate(Screen.YouTubePlayer.createRoute(videoKey, videoTitle))
+                }
+            )
+        }
+
+        // Followed Show Detail screen (tabbed interface for followed shows)
+        composable(
+            route = Screen.FollowedShowDetail.route,
+            arguments = listOf(
+                navArgument("showId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val showId = backStackEntry.arguments?.getLong("showId") ?: 0L
+            FollowedShowDetailScreen(
+                showId = showId,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onShowClick = { tmdbId ->
+                    // Navigate to another followed show detail (self-referential for spinoffs)
+                    navController.navigate(Screen.ShowDetailByTmdb.createRoute(tmdbId))
                 },
                 onVideoClick = { videoKey, videoTitle ->
                     navController.navigate(Screen.YouTubePlayer.createRoute(videoKey, videoTitle))

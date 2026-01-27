@@ -27,6 +27,13 @@ class SettingsRepository @Inject constructor(
         val INCLUDE_AIRING = booleanPreferencesKey("include_airing")
         val COUNTDOWN_DISPLAY_MODE = stringPreferencesKey("countdown_display_mode")
         val TIMELINE_SECTIONS_EXPANDED = booleanPreferencesKey("timeline_expanded_v2")
+        val HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
+        val HAS_SEEN_NOTIFICATION_SETTINGS = booleanPreferencesKey("has_seen_notification_settings")
+        val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
+        val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        // Debug settings
+        val DEBUG_SIMULATE_PREMIUM = booleanPreferencesKey("debug_simulate_premium")
+        val DEBUG_SHOW_FULL_ONBOARDING = booleanPreferencesKey("debug_show_full_onboarding")
     }
 
     /**
@@ -94,4 +101,128 @@ class SettingsRepository @Inject constructor(
             preferences[PreferencesKeys.TIMELINE_SECTIONS_EXPANDED] = !current
         }
     }
+
+    // region Sound & Haptics
+
+    /**
+     * Whether sound effects are enabled.
+     */
+    val soundEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.SOUND_ENABLED] ?: true
+        }
+
+    /**
+     * Whether haptic feedback is enabled.
+     */
+    val hapticsEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.HAPTICS_ENABLED] ?: true
+        }
+
+    /**
+     * Update sound enabled setting.
+     */
+    suspend fun setSoundEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SOUND_ENABLED] = enabled
+        }
+    }
+
+    /**
+     * Update haptics enabled setting.
+     */
+    suspend fun setHapticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HAPTICS_ENABLED] = enabled
+        }
+    }
+
+    // endregion
+
+    // region Onboarding
+
+    /**
+     * Whether the user has completed onboarding.
+     */
+    val hasCompletedOnboarding: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.HAS_COMPLETED_ONBOARDING] ?: false
+        }
+
+    /**
+     * Whether the user has seen notification settings during onboarding.
+     */
+    val hasSeenNotificationSettings: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.HAS_SEEN_NOTIFICATION_SETTINGS] ?: false
+        }
+
+    /**
+     * Mark onboarding as completed.
+     */
+    suspend fun setOnboardingCompleted(completed: Boolean = true) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HAS_COMPLETED_ONBOARDING] = completed
+        }
+    }
+
+    /**
+     * Mark notification settings as seen.
+     */
+    suspend fun setNotificationSettingsSeen(seen: Boolean = true) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HAS_SEEN_NOTIFICATION_SETTINGS] = seen
+        }
+    }
+
+    // endregion
+
+    // region Debug Settings
+
+    /**
+     * Whether to simulate premium status for testing.
+     */
+    val debugSimulatePremium: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.DEBUG_SIMULATE_PREMIUM] ?: false
+        }
+
+    /**
+     * Whether to show full onboarding flow (vs skipping to certain steps).
+     */
+    val debugShowFullOnboarding: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.DEBUG_SHOW_FULL_ONBOARDING] ?: false
+        }
+
+    /**
+     * Update simulate premium debug setting.
+     */
+    suspend fun setDebugSimulatePremium(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEBUG_SIMULATE_PREMIUM] = enabled
+        }
+    }
+
+    /**
+     * Update show full onboarding debug setting.
+     */
+    suspend fun setDebugShowFullOnboarding(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEBUG_SHOW_FULL_ONBOARDING] = enabled
+        }
+    }
+
+    /**
+     * Reset onboarding state for testing.
+     */
+    suspend fun resetOnboardingState() {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.HAS_COMPLETED_ONBOARDING] = false
+            preferences[PreferencesKeys.HAS_SEEN_NOTIFICATION_SETTINGS] = false
+        }
+    }
+
+    // endregion
 }

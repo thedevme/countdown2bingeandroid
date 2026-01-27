@@ -35,4 +35,24 @@ interface ShowDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM shows WHERE tmdbId = :tmdbId)")
     suspend fun isShowFollowed(tmdbId: Int): Boolean
+
+    // Sync-related queries
+
+    @Query("SELECT tmdbId FROM shows")
+    suspend fun getAllTmdbIds(): List<Int>
+
+    @Query("SELECT * FROM shows WHERE isSynced = 0")
+    suspend fun getUnsyncedShows(): List<Show>
+
+    @Query("UPDATE shows SET isSynced = 1, lastSyncedAt = :syncedAt WHERE tmdbId = :tmdbId")
+    suspend fun markAsSynced(tmdbId: Int, syncedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE shows SET isSynced = 0")
+    suspend fun clearSyncedStatus()
+
+    @Query("SELECT COUNT(*) FROM shows WHERE isSynced = 1")
+    fun getSyncedCount(): kotlinx.coroutines.flow.Flow<Int>
+
+    @Query("DELETE FROM shows WHERE tmdbId = :tmdbId")
+    suspend fun deleteByTmdbId(tmdbId: Int)
 }

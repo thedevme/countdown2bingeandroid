@@ -20,7 +20,9 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "countdown2binge.db"
-        ).build()
+        )
+            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides

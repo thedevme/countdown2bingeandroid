@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
 import io.designtoswiftui.countdown2binge.services.RefreshWorker
+import io.designtoswiftui.countdown2binge.services.premium.PremiumManager
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -19,6 +20,9 @@ class Countdown2BingeApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var premiumManager: PremiumManager
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -26,7 +30,15 @@ class Countdown2BingeApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        initializeRevenueCat()
         scheduleBackgroundRefresh()
+    }
+
+    /**
+     * Initialize RevenueCat SDK for premium subscription management.
+     */
+    private fun initializeRevenueCat() {
+        premiumManager.configure()
     }
 
     /**
