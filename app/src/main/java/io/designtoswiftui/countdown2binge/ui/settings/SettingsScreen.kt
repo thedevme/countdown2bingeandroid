@@ -122,7 +122,7 @@ fun SettingsScreen(
                 SavedShowsSection(
                     shows = savedShows,
                     syncedCount = savedShows.count { it.isSynced },
-                    isSignedIn = authState is AuthState.SignedIn
+                    canSync = isPremium && authState is AuthState.SignedIn
                 )
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -416,7 +416,7 @@ private fun AccountRow(authState: AuthState) {
 private fun SavedShowsSection(
     shows: List<Show>,
     syncedCount: Int,
-    isSignedIn: Boolean
+    canSync: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -438,7 +438,7 @@ private fun SavedShowsSection(
                 letterSpacing = 0.5.sp
             )
             Text(
-                text = if (isSignedIn) "Synced: $syncedCount / ${shows.size}" else "${shows.size} shows",
+                text = if (canSync) "Synced: $syncedCount / ${shows.size}" else "Not synced",
                 fontSize = 12.sp,
                 color = OnBackgroundMuted
             )
