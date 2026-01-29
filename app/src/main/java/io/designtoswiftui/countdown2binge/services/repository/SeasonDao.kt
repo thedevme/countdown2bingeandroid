@@ -5,9 +5,11 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import io.designtoswiftui.countdown2binge.models.Season
 import io.designtoswiftui.countdown2binge.models.SeasonState
+import io.designtoswiftui.countdown2binge.models.SeasonWithEpisodes
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -45,4 +47,22 @@ interface SeasonDao {
 
     @Query("UPDATE seasons SET watchedDate = NULL, state = :state WHERE id = :seasonId")
     suspend fun unmarkWatched(seasonId: Long, state: SeasonState)
+
+    // Relationship queries
+
+    @Transaction
+    @Query("SELECT * FROM seasons WHERE id = :id")
+    suspend fun getSeasonWithEpisodes(id: Long): SeasonWithEpisodes?
+
+    @Transaction
+    @Query("SELECT * FROM seasons WHERE id = :id")
+    fun getSeasonWithEpisodesFlow(id: Long): Flow<SeasonWithEpisodes?>
+
+    @Transaction
+    @Query("SELECT * FROM seasons WHERE showId = :showId ORDER BY seasonNumber ASC")
+    fun getSeasonsWithEpisodesForShow(showId: Long): Flow<List<SeasonWithEpisodes>>
+
+    @Transaction
+    @Query("SELECT * FROM seasons WHERE showId = :showId ORDER BY seasonNumber ASC")
+    suspend fun getSeasonsWithEpisodesForShowSync(showId: Long): List<SeasonWithEpisodes>
 }

@@ -7,6 +7,14 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.time.LocalDate
 
+/**
+ * Room entity representing a TV show followed by the user.
+ *
+ * This is the root entity in the data hierarchy:
+ * Show -> Seasons -> Episodes
+ * Show -> Genres (CASCADE)
+ * Show -> Networks (CASCADE)
+ */
 @Entity(tableName = "shows")
 data class Show(
     @PrimaryKey(autoGenerate = true)
@@ -16,13 +24,31 @@ data class Show(
     val overview: String?,
     val posterPath: String?,
     val backdropPath: String?,
+    val logoPath: String? = null,
+
+    // Airing info
+    val firstAirDate: LocalDate? = null,
     val status: ShowStatus = ShowStatus.UNKNOWN,
+    val statusRaw: String = "",
+    val numberOfSeasons: Int = 0,
+    val numberOfEpisodes: Int = 0,
+    val inProduction: Boolean = false,
+    val voteAverage: Double? = null,
+
+    // Current season tracking
+    val currentSeasonStartDate: LocalDate? = null,
+    val currentSeasonFinaleDate: LocalDate? = null,
+    val hasMidseasonBreak: Boolean = false,
+
+    // User tracking
     val addedDate: LocalDate = LocalDate.now(),
+    val isShowAdded: Boolean = true,
+    val lastUpdated: Long = System.currentTimeMillis(),
 
     // Sync metadata
-    val followedAt: Long = System.currentTimeMillis(),  // Unix timestamp in milliseconds
-    val lastSyncedAt: Long? = null,                      // Last sync timestamp, null if never synced
-    val isSynced: Boolean = false,                       // Whether this show has been synced to cloud
+    val followedAt: Long = System.currentTimeMillis(),
+    val lastSyncedAt: Long? = null,
+    val isSynced: Boolean = false,
 
     // Franchise/Spinoff data - JSON array of related TMDB IDs
     val relatedShowIdsJson: String? = null

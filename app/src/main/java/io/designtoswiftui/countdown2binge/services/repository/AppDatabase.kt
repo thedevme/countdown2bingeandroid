@@ -6,13 +6,22 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.designtoswiftui.countdown2binge.models.Episode
+import io.designtoswiftui.countdown2binge.models.Genre
+import io.designtoswiftui.countdown2binge.models.Network
 import io.designtoswiftui.countdown2binge.models.ScheduledNotification
 import io.designtoswiftui.countdown2binge.models.Season
 import io.designtoswiftui.countdown2binge.models.Show
 
 @Database(
-    entities = [Show::class, Season::class, Episode::class, ScheduledNotification::class],
-    version = 4,
+    entities = [
+        Show::class,
+        Season::class,
+        Episode::class,
+        Genre::class,
+        Network::class,
+        ScheduledNotification::class
+    ],
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -20,6 +29,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun showDao(): ShowDao
     abstract fun seasonDao(): SeasonDao
     abstract fun episodeDao(): EpisodeDao
+    abstract fun genreDao(): GenreDao
+    abstract fun networkDao(): NetworkDao
     abstract fun notificationDao(): NotificationDao
 
     companion object {
@@ -83,6 +94,69 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE shows ADD COLUMN relatedShowIdsJson TEXT"
                 )
+            }
+        }
+
+        /**
+         * Migration from version 4 to 5: Add new fields to Show/Season/Episode,
+         * create Genre and Network tables.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // ===== SHOW TABLE: Add 12 new columns =====
+                db.execSQL("ALTER TABLE shows ADD COLUMN logoPath TEXT")
+                db.execSQL("ALTER TABLE shows ADD COLUMN firstAirDate TEXT")
+                db.execSQL("ALTER TABLE shows ADD COLUMN statusRaw TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE shows ADD COLUMN numberOfSeasons INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE shows ADD COLUMN numberOfEpisodes INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE shows ADD COLUMN inProduction INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE shows ADD COLUMN voteAverage REAL")
+                db.execSQL("ALTER TABLE shows ADD COLUMN isShowAdded INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE shows ADD COLUMN lastUpdated INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE shows ADD COLUMN currentSeasonStartDate TEXT")
+                db.execSQL("ALTER TABLE shows ADD COLUMN currentSeasonFinaleDate TEXT")
+                db.execSQL("ALTER TABLE shows ADD COLUMN hasMidseasonBreak INTEGER NOT NULL DEFAULT 0")
+
+                // ===== SEASON TABLE: Add 4 new columns =====
+                db.execSQL("ALTER TABLE seasons ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE seasons ADD COLUMN overview TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE seasons ADD COLUMN voteAverage REAL")
+                db.execSQL("ALTER TABLE seasons ADD COLUMN hasWatched INTEGER NOT NULL DEFAULT 0")
+
+                // ===== EPISODE TABLE: Add 4 new columns =====
+                db.execSQL("ALTER TABLE episodes ADD COLUMN stillPath TEXT")
+                db.execSQL("ALTER TABLE episodes ADD COLUMN episodeType TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE episodes ADD COLUMN seasonNumber INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE episodes ADD COLUMN voteAverage REAL")
+
+                // ===== CREATE GENRE TABLE =====
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS genres (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        tmdbId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        showId INTEGER NOT NULL,
+                        FOREIGN KEY (showId) REFERENCES shows(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_genres_showId ON genres(showId)")
+
+                // ===== CREATE NETWORK TABLE =====
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS networks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        tmdbId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        logoPath TEXT,
+                        showId INTEGER NOT NULL,
+                        FOREIGN KEY (showId) REFERENCES shows(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_networks_showId ON networks(showId)")
             }
         }
     }

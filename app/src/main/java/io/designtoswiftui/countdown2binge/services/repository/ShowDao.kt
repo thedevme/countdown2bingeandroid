@@ -5,9 +5,13 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import io.designtoswiftui.countdown2binge.models.Show
 import io.designtoswiftui.countdown2binge.models.ShowStatus
+import io.designtoswiftui.countdown2binge.models.ShowWithDetails
+import io.designtoswiftui.countdown2binge.models.ShowWithSeasons
+import io.designtoswiftui.countdown2binge.models.ShowWithSeasonsAndEpisodes
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -69,4 +73,30 @@ interface ShowDao {
 
     @Query("SELECT COUNT(*) FROM shows")
     suspend fun getFollowedShowCount(): Int
+
+    // Relationship queries
+
+    @Transaction
+    @Query("SELECT * FROM shows WHERE id = :id")
+    suspend fun getShowWithSeasons(id: Long): ShowWithSeasons?
+
+    @Transaction
+    @Query("SELECT * FROM shows WHERE id = :id")
+    fun getShowWithSeasonsFlow(id: Long): Flow<ShowWithSeasons?>
+
+    @Transaction
+    @Query("SELECT * FROM shows WHERE id = :id")
+    suspend fun getShowWithDetails(id: Long): ShowWithDetails?
+
+    @Transaction
+    @Query("SELECT * FROM shows WHERE id = :id")
+    fun getShowWithDetailsFlow(id: Long): Flow<ShowWithDetails?>
+
+    @Transaction
+    @Query("SELECT * FROM shows WHERE id = :id")
+    suspend fun getShowWithSeasonsAndEpisodes(id: Long): ShowWithSeasonsAndEpisodes?
+
+    @Transaction
+    @Query("SELECT * FROM shows ORDER BY addedDate DESC")
+    fun getAllShowsWithDetails(): Flow<List<ShowWithDetails>>
 }
