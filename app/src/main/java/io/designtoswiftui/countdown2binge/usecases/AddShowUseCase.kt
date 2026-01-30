@@ -141,7 +141,13 @@ class AddShowUseCase @Inject constructor(
         val savedShow = repository.getShowById(showId)
             ?: return Result.failure(AddShowException.SaveFailed(tmdbId, null))
 
-        Log.d(TAG, "Quick add complete: '${savedShow.title}' saved with ${sortedQuickSeasons.size} seasons")
+        // Save genres and networks
+        val genres = processor.processGenres(fullData.showDetails.genres, showId)
+        val networks = processor.processNetworks(fullData.showDetails.networks, showId)
+        repository.saveGenres(showId, genres)
+        repository.saveNetworks(showId, networks)
+
+        Log.d(TAG, "Quick add complete: '${savedShow.title}' saved with ${sortedQuickSeasons.size} seasons, ${genres.size} genres, ${networks.size} networks")
 
         // Link franchise/spinoff data
         saveFranchiseData(tmdbId, showId)

@@ -47,16 +47,32 @@ class RefreshShowUseCase @Inject constructor(
 
         val fullData = fullDataResult.getOrThrow()
         val asOf = LocalDate.now()
+        val processedShow = processor.processShow(fullData, asOf)
 
-        // Update show details
+        // Update show details (preserve user tracking fields)
         val updatedShow = existingShow.copy(
             title = fullData.showDetails.name,
             overview = fullData.showDetails.overview,
             posterPath = fullData.showDetails.posterPath,
             backdropPath = fullData.showDetails.backdropPath,
-            status = processor.processShow(fullData, asOf).status
+            logoPath = processedShow.logoPath,
+            firstAirDate = processedShow.firstAirDate,
+            status = processedShow.status,
+            statusRaw = processedShow.statusRaw,
+            numberOfSeasons = processedShow.numberOfSeasons,
+            numberOfEpisodes = processedShow.numberOfEpisodes,
+            inProduction = processedShow.inProduction,
+            voteAverage = processedShow.voteAverage,
+            lastUpdated = System.currentTimeMillis()
+            // Preserved: isShowAdded, addedDate, followedAt, lastSyncedAt, isSynced
         )
         repository.update(updatedShow)
+
+        // Refresh genres and networks
+        val genres = processor.processGenres(fullData.showDetails.genres, showId)
+        val networks = processor.processNetworks(fullData.showDetails.networks, showId)
+        repository.saveGenres(showId, genres)
+        repository.saveNetworks(showId, networks)
 
         // Fetch ALL season details
         val allSeasonsResult = aggregator.fetchAllSeasons(tmdbId)
@@ -74,9 +90,11 @@ class RefreshShowUseCase @Inject constructor(
             val existingSeason = existingSeasons.find { it.tmdbId == seasonDetails.id }
 
             if (existingSeason != null) {
-                // Update existing season
+                // Update existing season (preserve watched state)
                 val processedSeason = processor.processSeason(seasonDetails, showId, asOf)
                 val updatedSeason = existingSeason.copy(
+                    name = processedSeason.name,
+                    overview = processedSeason.overview,
                     premiereDate = processedSeason.premiereDate,
                     finaleDate = processedSeason.finaleDate,
                     isFinaleEstimated = processedSeason.isFinaleEstimated,
@@ -88,7 +106,9 @@ class RefreshShowUseCase @Inject constructor(
                     } else {
                         stateManager.determineState(processedSeason, asOf)
                     },
+                    voteAverage = processedSeason.voteAverage,
                     posterPath = processedSeason.posterPath
+                    // Preserved: hasWatched, watchedDate
                 )
                 repository.updateSeason(updatedSeason)
 

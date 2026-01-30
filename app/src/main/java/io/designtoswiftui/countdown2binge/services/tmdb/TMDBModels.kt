@@ -50,6 +50,7 @@ data class TMDBShowDetails(
     @Json(name = "next_episode_to_air") val nextEpisodeToAir: TMDBEpisodeSummary?,
     @Json(name = "last_episode_to_air") val lastEpisodeToAir: TMDBEpisodeSummary?,
     @Json(name = "in_production") val inProduction: Boolean?,
+    @Json(name = "vote_average") val voteAverage: Double?,
     val networks: List<TMDBNetwork>?,
     val genres: List<TMDBGenre>?
 )
