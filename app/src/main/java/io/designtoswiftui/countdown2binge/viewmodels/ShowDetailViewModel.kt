@@ -190,6 +190,15 @@ class ShowDetailViewModel @Inject constructor(
     val seasonCount: Int
         get() = _showDetails.value?.numberOfSeasons ?: 0
 
+    val episodeCount: Int
+        get() = _showDetails.value?.numberOfEpisodes ?: 0
+
+    val rating: Double?
+        get() = _showDetails.value?.voteAverage
+
+    val networkName: String?
+        get() = _showDetails.value?.networks?.firstOrNull()?.name
+
     init {
         when {
             showId > 0 -> loadFollowedShow()

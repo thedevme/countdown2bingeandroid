@@ -170,8 +170,17 @@ class FollowedShowDetailViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Local seasons for countdown
+    // Local seasons for countdown and Info tab
     private val _localSeasons = MutableStateFlow<List<Season>>(emptyList())
+    val localSeasons: StateFlow<List<Season>> = _localSeasons.asStateFlow()
+
+    // Selected season for Info tab episode list
+    private val _selectedSeasonNumber = MutableStateFlow(1)
+    val selectedSeasonNumber: StateFlow<Int> = _selectedSeasonNumber.asStateFlow()
+
+    // Episodes for selected season
+    private val _selectedSeasonEpisodes = MutableStateFlow<List<Episode>>(emptyList())
+    val selectedSeasonEpisodes: StateFlow<List<Episode>> = _selectedSeasonEpisodes.asStateFlow()
 
     // Countdown timer job
     private var countdownJob: Job? = null
@@ -193,6 +202,15 @@ class FollowedShowDetailViewModel @Inject constructor(
 
     val seasonCount: Int
         get() = _showDetails.value?.numberOfSeasons ?: 0
+
+    val episodeCount: Int
+        get() = _showDetails.value?.numberOfEpisodes ?: 0
+
+    val rating: Double?
+        get() = _showDetails.value?.voteAverage
+
+    val networkName: String?
+        get() = _showDetails.value?.networks?.firstOrNull()?.name
 
     init {
         if (showId > 0) {
@@ -220,9 +238,18 @@ class FollowedShowDetailViewModel @Inject constructor(
                 if (loadedShow != null) {
                     _show.value = loadedShow
 
-                    // Load local seasons for countdown
+                    // Load local seasons for countdown and Info tab
                     val seasons = repository.getSeasonsForShowSync(showId)
                     _localSeasons.value = seasons
+
+                    // Set default selected season to the latest regular season
+                    val latestSeason = seasons
+                        .filter { it.seasonNumber > 0 }
+                        .maxByOrNull { it.seasonNumber }
+                    if (latestSeason != null) {
+                        _selectedSeasonNumber.value = latestSeason.seasonNumber
+                        loadEpisodesForSelectedSeason()
+                    }
 
                     // Fetch TMDB data
                     loadShowFromTmdb(loadedShow.tmdbId)
@@ -466,6 +493,42 @@ class FollowedShowDetailViewModel @Inject constructor(
 
     fun toggleSynopsisExpanded() {
         _isSynopsisExpanded.value = !_isSynopsisExpanded.value
+    }
+
+    /**
+     * Select a season number for the Info tab episode list.
+     */
+    fun selectSeason(seasonNumber: Int) {
+        _selectedSeasonNumber.value = seasonNumber
+        loadEpisodesForSelectedSeason()
+    }
+
+    /**
+     * Load episodes for the currently selected season.
+     */
+    private fun loadEpisodesForSelectedSeason() {
+        val seasonNumber = _selectedSeasonNumber.value
+        val season = _localSeasons.value.find { it.seasonNumber == seasonNumber }
+
+        if (season != null) {
+            viewModelScope.launch {
+                val episodes = repository.getEpisodesForSeasonSync(season.id)
+                _selectedSeasonEpisodes.value = episodes.sortedBy { it.episodeNumber }
+            }
+        } else {
+            _selectedSeasonEpisodes.value = emptyList()
+        }
+    }
+
+    /**
+     * Toggle watched status for an episode.
+     */
+    fun toggleEpisodeWatched(episodeId: Long, currentWatched: Boolean) {
+        viewModelScope.launch {
+            repository.setEpisodeWatched(episodeId, !currentWatched)
+            // Reload episodes to reflect change
+            loadEpisodesForSelectedSeason()
+        }
     }
 
     fun refresh() {

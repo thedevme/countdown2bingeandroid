@@ -34,12 +34,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.designtoswiftui.countdown2binge.models.GenreMapping
 import io.designtoswiftui.countdown2binge.ui.detail.components.BackdropHeader
 import io.designtoswiftui.countdown2binge.ui.detail.components.CastSection
-import io.designtoswiftui.countdown2binge.ui.detail.components.EpisodeSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.FollowActionButton
 import io.designtoswiftui.countdown2binge.ui.detail.components.GenreTagsSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.InfoSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.MoreLikeThisSection
-import io.designtoswiftui.countdown2binge.ui.detail.components.SeasonPicker
+import io.designtoswiftui.countdown2binge.ui.detail.components.SeasonEpisodeSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.SpinoffSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.TechnicalSpecsSection
 import io.designtoswiftui.countdown2binge.ui.detail.components.TrailersSection
@@ -58,13 +57,12 @@ import io.designtoswiftui.countdown2binge.viewmodels.ShowDetailViewModel
  * 2. InfoSection (expandable synopsis + metadata)
  * 3. GenreTagsSection (max 3 tags)
  * 4. FollowActionButton (48dp full-width)
- * 5. SeasonPicker (if multiple seasons)
- * 6. EpisodeSection (episode list with watermark)
- * 7. TrailersSection (horizontal video scroll)
- * 8. CastSection (horizontal cast scroll)
- * 9. MoreLikeThisSection (2-column recommendations)
- * 10. SpinoffSection (premium-gated franchise shows)
- * 11. TechnicalSpecsSection (badges + info rows)
+ * 5. SeasonEpisodeSection (season tabs + episode list with watermark)
+ * 6. TrailersSection (horizontal video scroll)
+ * 7. CastSection (horizontal cast scroll)
+ * 8. MoreLikeThisSection (2-column recommendations)
+ * 9. SpinoffSection (premium-gated franchise shows)
+ * 10. TechnicalSpecsSection (badges + info rows)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,7 +184,10 @@ fun ShowDetailScreen(
                                 seasonCount = viewModel.seasonCount,
                                 statusText = viewModel.statusText,
                                 isExpanded = isSynopsisExpanded,
-                                onExpandClick = viewModel::toggleSynopsisExpanded
+                                onExpandClick = viewModel::toggleSynopsisExpanded,
+                                episodeCount = viewModel.episodeCount,
+                                rating = viewModel.rating,
+                                networkName = viewModel.networkName
                             )
                         }
 
@@ -213,25 +214,15 @@ fun ShowDetailScreen(
                         // Spacing
                         item { Spacer(modifier = Modifier.height(20.dp)) }
 
-                        // 5. SeasonPicker (if multiple seasons)
-                        if (viewModel.hasMultipleSeasons) {
+                        // 5-6. Combined Season Tabs + Episode List
+                        if (viewModel.regularSeasons.isNotEmpty()) {
                             item {
-                                SeasonPicker(
+                                SeasonEpisodeSection(
                                     seasons = viewModel.regularSeasons,
-                                    selectedSeason = selectedSeasonNumber,
-                                    onSeasonSelected = viewModel::selectSeason
-                                )
-                            }
-                            item { Spacer(modifier = Modifier.height(16.dp)) }
-                        }
-
-                        // 6. EpisodeSection
-                        if (currentSeasonEpisodes.isNotEmpty()) {
-                            item {
-                                EpisodeSection(
-                                    seasonNumber = selectedSeasonNumber,
+                                    selectedSeasonNumber = selectedSeasonNumber,
                                     episodes = currentSeasonEpisodes,
                                     isExpanded = isEpisodeListExpanded,
+                                    onSeasonSelected = viewModel::selectSeason,
                                     onExpandClick = viewModel::toggleEpisodeListExpanded
                                 )
                             }

@@ -103,6 +103,11 @@ fun FollowedShowDetailScreen(
     val crew by viewModel.crew.collectAsState()
     val isSynopsisExpanded by viewModel.isSynopsisExpanded.collectAsState()
 
+    // Season/Episode content for Info tab
+    val localSeasons by viewModel.localSeasons.collectAsState()
+    val selectedSeasonNumber by viewModel.selectedSeasonNumber.collectAsState()
+    val selectedSeasonEpisodes by viewModel.selectedSeasonEpisodes.collectAsState()
+
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -271,13 +276,23 @@ fun FollowedShowDetailScreen(
                                         isSynopsisExpanded = isSynopsisExpanded,
                                         onSynopsisExpandClick = viewModel::toggleSynopsisExpanded,
                                         genres = genreNames,
+                                        seasons = localSeasons,
+                                        selectedSeasonNumber = selectedSeasonNumber,
+                                        selectedSeasonEpisodes = selectedSeasonEpisodes,
+                                        onSeasonSelected = viewModel::selectSeason,
+                                        onEpisodeWatchToggle = viewModel::toggleEpisodeWatched,
+                                        onViewAllEpisodes = {
+                                            // TODO: Navigate to full episode list
+                                        },
                                         videos = videos,
                                         onVideoClick = { video ->
                                             onVideoClick(video.key, video.name)
                                         },
                                         cast = cast,
                                         createdBy = createdBy,
-                                        network = networkName
+                                        network = networkName,
+                                        episodeCount = viewModel.episodeCount,
+                                        rating = viewModel.rating
                                     )
                                 }
                             }
